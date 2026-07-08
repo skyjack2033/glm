@@ -13,14 +13,17 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidTankInfo;
+import net.minecraftforge.fluids.IFluidTank;
 
 import com.cleanroommc.modularui.factory.PosGuiData;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.UISettings;
+import com.cleanroommc.modularui.utils.item.IItemHandlerModifiable;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.github.skyjack2033.wirelessmehatch.api.IWirelessMEHatch;
 import com.github.skyjack2033.wirelessmehatch.gui.MTEWirelessInputHatchMEGui;
 import com.github.skyjack2033.wirelessmehatch.me.MemoryCardHandler;
+import com.github.skyjack2033.wirelessmehatch.me.PlayerIdResolver;
 import com.github.skyjack2033.wirelessmehatch.me.WirelessGridManager;
 
 import appeng.api.config.Actionable;
@@ -133,6 +136,81 @@ public class MTEWirelessInputHatchME extends MTEHatchInput implements IDualInput
         return fluidSlots;
     }
 
+    /**
+     * Set the configured filter item for config slot {@code slot}. Used by the GUI's ghost-slot handler. Passing
+     * {@code null} (or an empty/invalid stack) clears the slot. Replaces the slot object and clears its extracted
+     * snapshot.
+     */
+    public void setItemConfig(int slot, ItemStack config) {
+        if (slot < 0 || slot >= SLOT_COUNT) return;
+        ItemStack cfg = (config == null || GTUtility.isStackInvalid(config)) ? null : config.copy();
+        if (cfg != null) {
+            // Ghost item: config stores a single representative item, not a count.
+            cfg.stackSize = 1;
+            itemSlots[slot] = new ItemSlotME(cfg);
+        } else {
+            itemSlots[slot] = new ItemSlotME();
+        }
+        updateItemSlotQuietly(slot);
+        markDirty();
+    }
+
+    /**
+     * Set the configured filter fluid for config slot {@code slot}. Used by the GUI's ghost-tank handler. Passing
+     * {@code null} clears the slot. Replaces the slot object and clears its extracted snapshot.
+     */
+    public void setFluidConfig(int slot, FluidStack config) {
+        if (slot < 0 || slot >= SLOT_COUNT) return;
+        FluidStack cfg = (config == null || config.amount <= 0) ? null : config.copy();
+        if (cfg != null) {
+            // Ghost fluid: config stores a single FluidUnit representative, not a bulk amount.
+            cfg.amount = 1000;
+            fluidSlots[slot] = new FluidSlot(cfg);
+        } else {
+            fluidSlots[slot] = new FluidSlot();
+        }
+        updateFluidSlotQuietly(slot);
+        markDirty();
+    }
+
+    /**
+     * @return an {@link IItemHandlerModifiable} view over the item config slots, for the GUI's ghost-item grid. Writing
+     *         a stack into a slot sets that slot's config (ghost); the handler never holds real inventory.
+     */
+    public IItemHandlerModifiable getItemConfigHandler() {
+        return new ItemConfigHandler();
+    }
+
+    /**
+     * @return the config-tank for a given fluid config slot index, for the GUI's ghost-fluid widget. {@code fill} sets
+     *         the slot's config fluid; {@code drain} clears it.
+     */
+    public IFluidTank getFluidConfigTank(int slot) {
+        return new FluidConfigTank(slot);
+    }
+
+    /**
+     * Refresh a single item slot's extracted snapshot without throwing on grid failure (used after a config change).
+     */
+    private void updateItemSlotQuietly(int i) {
+        try {
+            updateItemSlot(i);
+        } catch (GridAccessException ignored) {
+            // Network unavailable - leave the snapshot empty until the next refresh.
+        }
+    }
+
+    /**
+     * Refresh a single fluid slot's extracted snapshot without throwing on grid failure (used after a config change).
+     */
+    private void updateFluidSlotQuietly(int i) {
+        try {
+            updateFluidSlot(i);
+        } catch (GridAccessException ignored) {
+            // Network unavailable - leave the snapshot empty until the next refresh.
+        }
+    }
+
     @Override
     public gregtech.api.metatileentity.MetaTileEntity newMetaEntity(IGregTechTileEntity aTileEntity) {
         return new MTEWirelessInputHatchME(mName, mTier, mDescriptionArray, mTextures);
@@ -156,8 +234,9 @@ public class MTEWirelessInputHatchME extends MTEHatchInput implements IDualInput
     }
 
     /**
-     * Idempotent: {@code WirelessGridManager} fires this twice on bind (tear-down then re-establish).
-     * {@code markDirty()} is itself idempotent, so this is safe.
+     * {@code WirelessGridManager} coalesces its internal destroy→establish callbacks into a single notification per net
+     * state change (see {@code suppressCallback}), so this fires at most once per bind/reconnect.
+     * {@code markDirty()} is itself idempotent, so even a stray double-fire is safe.
      */
     private void onWirelessConnectionChanged() {
         markDirty();
@@ -550,6 +629,11 @@ public class MTEWirelessInputHatchME extends MTEHatchInput implements IDualInput
     public void onFirstTick(IGregTechTileEntity aBaseMetaTileEntity) {
         super.onFirstTick(aBaseMetaTileEntity);
         getProxy().onReady();
+        // I2: stamp the owner's AE2 player ID onto the grid node so the hatch passes Security Terminal checks. Done
+        // after
+        // onReady() so the node exists.
+        PlayerIdResolver
+            .applyOwnerPlayerId(this, aBaseMetaTileEntity.getOwnerUuid(), aBaseMetaTileEntity.getOwnerName());
         wirelessManager.tickCheck();
     }
 
@@ -697,10 +781,15 @@ public class MTEWirelessInputHatchME extends MTEHatchInput implements IDualInput
     /**
      * Fluid slot snapshot, copied from {@code MTEHatchInputME$Slot}. Holds a {@code config} fluid (the configured
      * filter) plus a {@code extracted}/{@code extractedAmount} snapshot of what the ME network can currently supply.
+     *
+     * <p>
+     * The {@code config} field is mutable so the GUI's ghost-slot handler can set it; the slot is replaced in the
+     * {@link #fluidSlots} array whenever the config changes (see {@link #setFluidConfig(int, FluidStack)}).
+     * </p>
      */
     public static final class FluidSlot {
 
-        public final FluidStack config;
+        public FluidStack config;
         public int extractedAmount;
         public FluidStack extracted;
 
@@ -710,6 +799,15 @@ public class MTEWirelessInputHatchME extends MTEHatchInput implements IDualInput
 
         public FluidSlot(FluidStack config) {
             this.config = config;
+        }
+
+        /**
+         * Replace this slot's configured filter fluid. Clears the extracted snapshot so the next snapshot refresh
+         * re-reads the ME network for the new filter.
+         */
+        public void setConfig(FluidStack newConfig) {
+            this.config = newConfig == null ? null : newConfig.copy();
+            resetExtracted();
         }
 
         public void resetExtracted() {
@@ -754,13 +852,19 @@ public class MTEWirelessInputHatchME extends MTEHatchInput implements IDualInput
      * Item slot snapshot, copied from {@code MTEHatchInputBusME$Slot}. Holds a {@code config} item (the configured
      * filter) plus a {@code extracted}/{@code extractedAmount} snapshot and a cached {@code prototypeStack} used to
      * build AE request stacks.
+     *
+     * <p>
+     * The {@code config} field is mutable so the GUI's ghost-slot handler can set it; {@code setConfig} rebuilds the
+     * cached {@code prototypeStack} and clears the extracted snapshot. The slot is replaced in the {@link #itemSlots}
+     * array whenever the config changes (see {@link #setItemConfig(int, ItemStack)}).
+     * </p>
      */
     public static final class ItemSlotME {
 
-        public final ItemStack config;
+        public ItemStack config;
         public int extractedAmount;
         public ItemStack extracted;
-        private final IAEItemStack prototypeStack;
+        private IAEItemStack prototypeStack;
 
         public ItemSlotME() {
             this.config = null;
@@ -770,6 +874,17 @@ public class MTEWirelessInputHatchME extends MTEHatchInput implements IDualInput
         public ItemSlotME(ItemStack config) {
             this.config = config;
             this.prototypeStack = config == null ? null : AEItemStack.create(config);
+        }
+
+        /**
+         * Replace this slot's configured filter item. Rebuilds the cached {@code prototypeStack} and clears the
+         * extracted
+         * snapshot so the next snapshot refresh re-reads the ME network for the new filter.
+         */
+        public void setConfig(ItemStack newConfig) {
+            this.config = newConfig == null ? null : newConfig.copy();
+            this.prototypeStack = this.config == null ? null : AEItemStack.create(this.config);
+            resetExtracted();
         }
 
         public void resetExtracted() {
@@ -807,6 +922,112 @@ public class MTEWirelessInputHatchME extends MTEHatchInput implements IDualInput
             if (tag.hasKey("extracted")) {
                 out.extracted = ItemStack.loadItemStackFromNBT(tag.getCompoundTag("extracted"));
                 out.extractedAmount = tag.getInteger("extractedAmount");
+            }
+            return out;
+        }
+    }
+
+    // ---- Config-slot handlers (ghost items / fluids for the GUI) ----
+
+    /**
+     * {@link IItemHandlerModifiable} view over the {@link #itemSlots} config array, used by the GUI's ghost-item grid.
+     * Each slot reports the slot's configured filter item (stack size 1). {@link #setStackInSlot} writes a config
+     * (ghost) - the item is never held as real inventory, and {@link #insertItem}/{@link #extractItem} are no-ops that
+     * return the input unchanged so the slot behaves as phantom-only.
+     */
+    private final class ItemConfigHandler implements IItemHandlerModifiable {
+
+        @Override
+        public int getSlots() {
+            return SLOT_COUNT;
+        }
+
+        @Override
+        public ItemStack getStackInSlot(int slot) {
+            if (slot < 0 || slot >= SLOT_COUNT || itemSlots[slot] == null) return null;
+            ItemStack config = itemSlots[slot].config;
+            return config == null ? null : config.copy();
+        }
+
+        @Override
+        public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
+            // Phantom slot: insert is handled via setStackInSlot by the ghost-slot machinery; never consume the input.
+            return stack;
+        }
+
+        @Override
+        public ItemStack extractItem(int slot, int amount, boolean simulate) {
+            // Phantom slot: nothing real to extract.
+            return null;
+        }
+
+        @Override
+        public int getSlotLimit(int slot) {
+            return 1;
+        }
+
+        @Override
+        public void setStackInSlot(int slot, ItemStack stack) {
+            setItemConfig(slot, stack);
+        }
+    }
+
+    /**
+     * {@link IFluidTank} view over a single {@link #fluidSlots} config entry, used by the GUI's ghost-fluid widget.
+     * {@link #fill} sets the slot's config fluid (ghost); {@link #drain} clears it. The tank reports a 1-bucket
+     * capacity and the configured fluid so the widget renders the filter.
+     */
+    public final class FluidConfigTank implements IFluidTank {
+
+        private final int slotIndex;
+
+        FluidConfigTank(int slotIndex) {
+            this.slotIndex = slotIndex;
+        }
+
+        private FluidSlot slot() {
+            if (slotIndex < 0 || slotIndex >= SLOT_COUNT) return null;
+            return fluidSlots[slotIndex];
+        }
+
+        @Override
+        public FluidStack getFluid() {
+            FluidSlot slot = slot();
+            return slot == null || slot.config == null ? null : slot.config.copy();
+        }
+
+        @Override
+        public int getFluidAmount() {
+            FluidSlot slot = slot();
+            return slot == null || slot.config == null ? 0 : slot.config.amount;
+        }
+
+        @Override
+        public int getCapacity() {
+            return 1000;
+        }
+
+        @Override
+        public FluidTankInfo getInfo() {
+            return new FluidTankInfo(getFluid(), getCapacity());
+        }
+
+        @Override
+        public int fill(FluidStack resource, boolean doFill) {
+            if (resource == null || resource.getFluid() == null) return 0;
+            if (doFill) {
+                setFluidConfig(slotIndex, resource);
+            }
+            return resource.amount;
+        }
+
+        @Override
+        public FluidStack drain(int maxDrain, boolean doDrain) {
+            FluidSlot slot = slot();
+            if (slot == null || slot.config == null) return null;
+            FluidStack out = slot.config.copy();
+            if (doDrain) {
+                setFluidConfig(slotIndex, null);
             }
             return out;
         }

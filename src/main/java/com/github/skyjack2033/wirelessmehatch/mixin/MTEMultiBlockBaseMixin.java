@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import net.minecraft.item.ItemStack;
-import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.FluidStack;
 
 import org.spongepowered.asm.mixin.Mixin;
@@ -227,23 +226,25 @@ public class MTEMultiBlockBaseMixin {
     }
 
     /**
-     * Push {@code fluid} (the running remainder) to every dual output hatch via Forge's {@code fill}. The hatch's
-     * {@code fill_default} routes to its ME storage. {@code fill} returns the amount accepted without mutating the
-     * passed
-     * stack, so we reduce {@code fluid.amount} by the accepted amount and stop once nothing remains - matching
-     * {@code FluidEjectionHelper}.
+     * Push {@code fluid} (the running remainder) to every dual output hatch via its side-less {@code fill}. The hatch's
+     * {@code fill} returns the amount accepted without mutating the passed stack, so we decrement a local working copy
+     * and stop once nothing remains - matching {@code FluidEjectionHelper}. The original {@code fluid} is not mutated
+     * so
+     * callers that re-read the array element see the helper-supplied remainder.
      */
     private void wirelessmehatch$dispatchFluid(FluidStack fluid) {
         if (fluid == null || fluid.amount <= 0) {
             return;
         }
+        // Work on a copy so we never mutate the caller's array element; report nothing about how much was consumed.
+        FluidStack remainder = fluid.copy();
         for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
-            if (fluid.amount <= 0) {
+            if (remainder.amount <= 0) {
                 break;
             }
-            int accepted = dual.fill(ForgeDirection.UNKNOWN, fluid, true);
+            int accepted = dual.fill(remainder, true);
             if (accepted > 0) {
-                fluid.amount -= accepted;
+                remainder.amount -= accepted;
             }
         }
     }

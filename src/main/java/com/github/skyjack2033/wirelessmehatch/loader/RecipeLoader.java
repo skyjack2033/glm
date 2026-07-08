@@ -3,6 +3,8 @@ package com.github.skyjack2033.wirelessmehatch.loader;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 
+import com.github.skyjack2033.wirelessmehatch.WirelessMEHatch;
+
 import gregtech.api.enums.ItemList;
 import gregtech.api.util.GTModHandler;
 
@@ -29,11 +31,21 @@ public final class RecipeLoader {
         ItemStack wirelessOutput = GTModHandler
             .getModItem("gregtech", "gt.blockmachines", 1, MetaTileEntityLoader.WIRELESS_OUTPUT_HATCH_ME_ID);
 
-        GTModHandler.addCraftingRecipe(
-            wirelessOutput,
-            GTModHandler.RecipeBits.NOT_REMOVABLE,
-            new Object[] { "ABA", "CDC", "AEA", 'A', meOutputHatch, 'B', meOutputBus, 'C', quantumSingularity, 'D',
-                ItemList.Circuit_Advanced.get(1), 'E', Items.ender_eye });
+        if (meOutputHatch == null || meOutputBus == null || quantumSingularity == null || wirelessOutput == null) {
+            WirelessMEHatch.LOG.warn(
+                "Skipping Wireless Output Hatch ME recipe registration: a required ingredient is null "
+                    + "(meOutputHatch={}, meOutputBus={}, quantumSingularity={}, wirelessOutput={}).",
+                meOutputHatch,
+                meOutputBus,
+                quantumSingularity,
+                wirelessOutput);
+        } else {
+            GTModHandler.addCraftingRecipe(
+                wirelessOutput,
+                GTModHandler.RecipeBits.NOT_REMOVABLE,
+                new Object[] { "ABA", "CDC", "AEA", 'A', meOutputHatch, 'B', meOutputBus, 'C', quantumSingularity, 'D',
+                    ItemList.Circuit_Advanced.get(1), 'E', Items.ender_eye });
+        }
 
         // Wireless Input Hatch (ME) = ME Input Hatch + ME Input Bus + Quantum Singularity + tier circuit
         ItemStack meInputHatch = ItemList.Hatch_Input_ME.get(1);
@@ -41,10 +53,20 @@ public final class RecipeLoader {
         ItemStack wirelessInput = GTModHandler
             .getModItem("gregtech", "gt.blockmachines", 1, MetaTileEntityLoader.WIRELESS_INPUT_HATCH_ME_ID);
 
-        GTModHandler.addCraftingRecipe(
-            wirelessInput,
-            GTModHandler.RecipeBits.NOT_REMOVABLE,
-            new Object[] { "ABA", "CDC", "AEA", 'A', meInputHatch, 'B', meInputBus, 'C', quantumSingularity, 'D',
-                ItemList.Circuit_Advanced.get(1), 'E', Items.ender_eye });
+        if (meInputHatch == null || meInputBus == null || quantumSingularity == null || wirelessInput == null) {
+            WirelessMEHatch.LOG.warn(
+                "Skipping Wireless Input Hatch ME recipe registration: a required ingredient is null "
+                    + "(meInputHatch={}, meInputBus={}, quantumSingularity={}, wirelessInput={}).",
+                meInputHatch,
+                meInputBus,
+                quantumSingularity,
+                wirelessInput);
+        } else {
+            GTModHandler.addCraftingRecipe(
+                wirelessInput,
+                GTModHandler.RecipeBits.NOT_REMOVABLE,
+                new Object[] { "ABA", "CDC", "AEA", 'A', meInputHatch, 'B', meInputBus, 'C', quantumSingularity, 'D',
+                    ItemList.Circuit_Advanced.get(1), 'E', Items.ender_eye });
+        }
     }
 }

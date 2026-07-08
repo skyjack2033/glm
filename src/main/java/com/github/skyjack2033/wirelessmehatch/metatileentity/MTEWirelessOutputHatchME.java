@@ -15,6 +15,7 @@ import com.github.skyjack2033.wirelessmehatch.api.IDualOutputHatch;
 import com.github.skyjack2033.wirelessmehatch.api.IWirelessMEHatch;
 import com.github.skyjack2033.wirelessmehatch.gui.MTEWirelessOutputHatchMEGui;
 import com.github.skyjack2033.wirelessmehatch.me.MemoryCardHandler;
+import com.github.skyjack2033.wirelessmehatch.me.PlayerIdResolver;
 import com.github.skyjack2033.wirelessmehatch.me.WirelessGridManager;
 
 import appeng.api.AEApi;
@@ -116,8 +117,10 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
     }
 
     /**
-     * Idempotent: {@code WirelessGridManager} fires this twice on bind (once when destroying the old connection, once
-     * when establishing the new one). {@code markDirty()} is itself idempotent, so this is safe.
+     * {@code WirelessGridManager} coalesces its internal destroy→establish callbacks into a single notification per net
+     * state change (see {@code suppressCallback}), so this fires at most once per bind/reconnect. {@code markDirty()}
+     * is
+     * itself idempotent, so even a stray double-fire is safe.
      */
     private void onWirelessConnectionChanged() {
         markDirty();
@@ -301,6 +304,11 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
     public void onFirstTick(IGregTechTileEntity aBaseMetaTileEntity) {
         super.onFirstTick(aBaseMetaTileEntity);
         getProxy().onReady();
+        // I2: stamp the owner's AE2 player ID onto the grid node so the hatch passes Security Terminal checks. Done
+        // after
+        // onReady() so the node exists.
+        PlayerIdResolver
+            .applyOwnerPlayerId(this, aBaseMetaTileEntity.getOwnerUuid(), aBaseMetaTileEntity.getOwnerName());
         fluidProvider.updateState();
         wirelessManager.tickCheck();
     }
@@ -333,12 +341,17 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
     public void saveNBTData(NBTTagCompound aNBT) {
         super.saveNBTData(aNBT);
         wirelessManager.writeToNBT(aNBT);
-        // Each provider persists into its own sub-compound so the keys (cache/myPriority/proxy/...) do not collide.
+        // Each provider persists into its own sub-compound so the keys (cache/myPriority/...) do not collide.
         NBTTagCompound fluidTag = new NBTTagCompound();
         fluidProvider.saveNBTData(fluidTag);
         aNBT.setTag("fluidProvider", fluidTag);
         NBTTagCompound itemTag = new NBTTagCompound();
         itemProvider.saveNBTData(itemTag);
+        // I3: both providers share a single AENetworkProxy, and MTEHatchOutputMEBase.saveNBTData writes that proxy's
+        // NBT (under the "proxy" key) into whichever tag it is handed. Persisting it in BOTH sub-compounds is
+        // redundant and lets the item provider's later load clobber the fluid provider's proxy state. The fluid
+        // provider owns the proxy, so strip the duplicate proxy tag from the item provider's sub-compound.
+        itemTag.removeTag("proxy");
         aNBT.setTag("itemProvider", itemTag);
     }
 
@@ -346,6 +359,8 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
     public void loadNBTData(NBTTagCompound aNBT) {
         super.loadNBTData(aNBT);
         wirelessManager.readFromNBT(aNBT);
+        // Load the owning (fluid) provider first - it restores the shared proxy's NBT. The item provider's sub-compound
+        // has its proxy tag stripped on save (see saveNBTData), so it only restores its own cache/priority state.
         fluidProvider.loadNBTData(aNBT.getCompoundTag("fluidProvider"));
         itemProvider.loadNBTData(aNBT.getCompoundTag("itemProvider"));
         restoreLegacyCachedStacks(aNBT);
