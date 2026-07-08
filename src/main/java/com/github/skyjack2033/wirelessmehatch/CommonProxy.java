@@ -1,6 +1,7 @@
 package com.github.skyjack2033.wirelessmehatch;
 
 import com.github.skyjack2033.wirelessmehatch.loader.MetaTileEntityLoader;
+import com.github.skyjack2033.wirelessmehatch.loader.RecipeLoader;
 
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
@@ -17,7 +18,9 @@ public class CommonProxy {
         MetaTileEntityLoader.register();
     }
 
-    public void postInit(FMLPostInitializationEvent event) {}
+    public void postInit(FMLPostInitializationEvent event) {
+        RecipeLoader.register();
+    }
 
     public void serverStarting(FMLServerStartingEvent event) {}
 }
