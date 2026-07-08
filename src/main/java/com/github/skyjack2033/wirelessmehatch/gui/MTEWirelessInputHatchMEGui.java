@@ -15,7 +15,7 @@ import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.cleanroommc.modularui.widgets.slot.FluidSlot;
 import com.github.skyjack2033.wirelessmehatch.metatileentity.MTEWirelessInputHatchME;
 
-import gregtech.api.gui.modularui2.GTGuis;
+import gregtech.api.modularui2.GTGuis;
 import gregtech.common.modularui2.widget.builder.ItemSlotGridBuilder;
 
 /**

@@ -21,7 +21,7 @@ import com.github.skyjack2033.wirelessmehatch.metatileentity.MTEWirelessOutputHa
 
 import appeng.api.AEApi;
 import appeng.api.storage.StorageChannel;
-import gregtech.api.gui.modularui2.GTGuis;
+import gregtech.api.modularui2.GTGuis;
 import gregtech.api.util.GTUtility;
 
 /**

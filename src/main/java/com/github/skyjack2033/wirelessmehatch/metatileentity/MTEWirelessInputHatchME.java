@@ -34,6 +34,7 @@ import appeng.api.networking.events.MENetworkBootingStatusChange;
 import appeng.api.networking.events.MENetworkEventSubscribe;
 import appeng.api.networking.events.MENetworkPowerStatusChange;
 import appeng.api.networking.security.BaseActionSource;
+import appeng.api.networking.security.IActionHost;
 import appeng.api.networking.security.MachineSource;
 import appeng.api.networking.storage.IStackWatcher;
 import appeng.api.networking.storage.IStackWatcherHost;
@@ -78,8 +79,9 @@ import gregtech.common.tileentities.machines.IHatchWatcher;
  * endRecipeProcessing commits via {@code Platform.poweredExtraction}) is copied verbatim from the two GT classes.
  * </p>
  */
-public class MTEWirelessInputHatchME extends MTEHatchInput implements IDualInputHatch, IWirelessMEHatch, IGridProxyable,
-    IPowerChannelState, IStackWatcherHost, gregtech.common.tileentities.machines.IRecipeProcessingAwareHatch {
+public class MTEWirelessInputHatchME extends MTEHatchInput
+    implements IDualInputHatch, IWirelessMEHatch, IGridProxyable, IActionHost, IPowerChannelState, IStackWatcherHost,
+    gregtech.common.tileentities.machines.IRecipeProcessingAwareHatch {
 
     /** Number of ME-backed fluid slots and item slots (16 each, matching GT's ME input hatches). */
     public static final int SLOT_COUNT = 16;
@@ -338,8 +340,12 @@ public class MTEWirelessInputHatchME extends MTEHatchInput implements IDualInput
         }
         IAEFluidStack extracted;
         if (doDrain) {
-            extracted = (IAEFluidStack) appeng.util.Platform
-                .poweredExtraction(proxy.getEnergy(), fluidInv, request, getRequestSource());
+            try {
+                extracted = (IAEFluidStack) appeng.util.Platform
+                    .poweredExtraction(proxy.getEnergy(), fluidInv, request, getRequestSource());
+            } catch (GridAccessException e) {
+                return null;
+            }
             updateAllInformationSlots();
         } else {
             extracted = (IAEFluidStack) fluidInv.extractItems(request, Actionable.SIMULATE, getRequestSource());

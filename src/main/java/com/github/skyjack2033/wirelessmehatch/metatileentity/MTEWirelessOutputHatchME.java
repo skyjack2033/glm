@@ -22,6 +22,7 @@ import appeng.api.AEApi;
 import appeng.api.implementations.IPowerChannelState;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.security.BaseActionSource;
+import appeng.api.networking.security.IActionHost;
 import appeng.api.networking.security.MachineSource;
 import appeng.api.storage.ISaveProvider;
 import appeng.api.storage.StorageChannel;
@@ -54,7 +55,7 @@ import gregtech.common.tileentities.machines.outputme.base.MTEHatchOutputMEBase;
  * {@code storePartial}).
  */
 public class MTEWirelessOutputHatchME extends MTEHatchOutput
-    implements IDualOutputHatch, IWirelessMEHatch, IGridProxyable, IPowerChannelState {
+    implements IDualOutputHatch, IWirelessMEHatch, IGridProxyable, IActionHost, IPowerChannelState {
 
     /**
      * Note: GT's {@code MTEHatchOutputME} also implements {@code ICellContainer} (which extends AE2's
