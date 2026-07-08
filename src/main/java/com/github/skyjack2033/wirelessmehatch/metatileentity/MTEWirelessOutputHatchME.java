@@ -13,6 +13,7 @@ import com.cleanroommc.modularui.screen.UISettings;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.github.skyjack2033.wirelessmehatch.api.IDualOutputHatch;
 import com.github.skyjack2033.wirelessmehatch.api.IWirelessMEHatch;
+import com.github.skyjack2033.wirelessmehatch.gui.MTEWirelessOutputHatchMEGui;
 import com.github.skyjack2033.wirelessmehatch.me.MemoryCardHandler;
 import com.github.skyjack2033.wirelessmehatch.me.WirelessGridManager;
 
@@ -36,7 +37,6 @@ import gregtech.api.interfaces.IOutputBusTransaction;
 import gregtech.api.interfaces.IOutputHatchTransaction;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.metatileentity.implementations.MTEHatchOutput;
-import gregtech.api.modularui2.GTGuis;
 import gregtech.api.util.GTUtility;
 import gregtech.common.tileentities.machines.outputme.base.MTEHatchOutputMEBase;
 
@@ -194,6 +194,40 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
      */
     ItemStack getCellStack() {
         return mInventory[0];
+    }
+
+    // ---- GUI accessors (used by MTEWirelessOutputHatchMEGui) ----
+
+    /**
+     * @return the fluid provider's ME priority. Both providers share one {@link AENetworkProxy} and therefore one grid
+     *         membership, so a single priority value is sufficient for the GUI.
+     */
+    public int getPriority() {
+        return fluidProvider.getPriority();
+    }
+
+    /** @see #getPriority() */
+    public void setPriority(int priority) {
+        fluidProvider.setPriority(priority);
+    }
+
+    /**
+     * @return the fluid provider's cache/check mode flag ({@code MTEHatchOutputMEBase.getCacheMode()}).
+     */
+    public boolean isCacheMode() {
+        return fluidProvider.getCacheMode();
+    }
+
+    /** @see #isCacheMode() */
+    public void setCacheMode(boolean cacheMode) {
+        fluidProvider.setCacheMode(cacheMode);
+    }
+
+    /**
+     * @return a cached item-stack count summary for the GUI (sum of the fluid + item caches). Computed on demand.
+     */
+    public long getCachedItemCount() {
+        return fluidProvider.getCachedAmount() + itemProvider.getCachedAmount();
     }
 
     // ---- Fluid output (mirrors MTEHatchOutputME.fill) ----
@@ -567,8 +601,7 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
 
     @Override
     public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager syncManager, UISettings uiSettings) {
-        return GTGuis.mteTemplatePanelBuilder(this, guiData, syncManager, uiSettings)
-            .build();
+        return new MTEWirelessOutputHatchMEGui(this).build(guiData, syncManager, uiSettings);
     }
 
     /**

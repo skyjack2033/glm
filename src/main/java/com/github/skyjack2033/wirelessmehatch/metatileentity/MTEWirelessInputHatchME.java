@@ -19,6 +19,7 @@ import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.UISettings;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.github.skyjack2033.wirelessmehatch.api.IWirelessMEHatch;
+import com.github.skyjack2033.wirelessmehatch.gui.MTEWirelessInputHatchMEGui;
 import com.github.skyjack2033.wirelessmehatch.me.MemoryCardHandler;
 import com.github.skyjack2033.wirelessmehatch.me.WirelessGridManager;
 
@@ -47,7 +48,6 @@ import appeng.util.item.AEItemStack;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.metatileentity.implementations.MTEHatchInput;
 import gregtech.api.metatileentity.implementations.MTEMultiBlockBase;
-import gregtech.api.modularui2.GTGuis;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.recipe.check.SimpleCheckRecipeResult;
@@ -121,6 +121,16 @@ public class MTEWirelessInputHatchME extends MTEHatchInput implements IDualInput
             fluidSlots[i] = new FluidSlot();
             itemSlots[i] = new ItemSlotME();
         }
+    }
+
+    /** @return the ME-backed item config slots (read-only view for the GUI). */
+    public ItemSlotME[] getItemSlots() {
+        return itemSlots;
+    }
+
+    /** @return the ME-backed fluid config slots (read-only view for the GUI). */
+    public FluidSlot[] getFluidSlots() {
+        return fluidSlots;
     }
 
     @Override
@@ -679,8 +689,7 @@ public class MTEWirelessInputHatchME extends MTEHatchInput implements IDualInput
 
     @Override
     public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager syncManager, UISettings uiSettings) {
-        return GTGuis.mteTemplatePanelBuilder(this, guiData, syncManager, uiSettings)
-            .build();
+        return new MTEWirelessInputHatchMEGui(this).build(guiData, syncManager, uiSettings);
     }
 
     // ---- Inner slot classes (copied from GT's MTEHatchInputME.Slot / MTEHatchInputBusME.Slot) ----
