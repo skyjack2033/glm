@@ -109,7 +109,16 @@ public class MTEWirelessInputHatchME extends MTEHatchInput
     private boolean cachedActivity = false;
 
     public MTEWirelessInputHatchME(int aID, String aName, String aNameRegional) {
-        super(aID, aName, aNameRegional, TIER);
+        super(
+            aID,
+            aName,
+            aNameRegional,
+            TIER,
+            new String[] { "Wireless Input Hatch for Multiblocks",
+                "Pulls items and fluids from a bound ME network (wireless)",
+                "Merges item bus and fluid hatch into one block", "16 item and 16 fluid config slots for filtering",
+                "Right click with AE2 Memory Card (bound to a WAP) to connect",
+                "Screwdriver right click to unbind the WAP" });
         initSlots();
         this.wirelessManager = new WirelessGridManager(this, this::onWirelessConnectionChanged);
     }
@@ -248,9 +257,12 @@ public class MTEWirelessInputHatchME extends MTEHatchInput
 
     @Override
     public boolean onRightclick(IGregTechTileEntity aBaseMetaTileEntity, EntityPlayer aPlayer) {
-        ItemStack held = aPlayer.getHeldItem();
-        if (held != null && MemoryCardHandler.bindHatchFromCard(this, held, aPlayer)) {
-            return true;
+        // Memory Card binding only on server side - on client, always fall through to super so GUI opens.
+        if (aBaseMetaTileEntity.isServerSide()) {
+            ItemStack held = aPlayer.getHeldItem();
+            if (held != null && MemoryCardHandler.bindHatchFromCard(this, held, aPlayer)) {
+                return true;
+            }
         }
         return super.onRightclick(aBaseMetaTileEntity, aPlayer);
     }

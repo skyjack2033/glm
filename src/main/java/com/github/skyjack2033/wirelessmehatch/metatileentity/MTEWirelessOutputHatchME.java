@@ -79,7 +79,18 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
     private EntityPlayer lastClickedPlayer;
 
     public MTEWirelessOutputHatchME(int aID, String aName, String aNameRegional) {
-        super(aID, aName, aNameRegional, TIER);
+        super(
+            aID,
+            aName,
+            aNameRegional,
+            TIER,
+            new String[] { "Wireless Output Hatch for Multiblocks",
+                "Stores items and fluids directly into a bound ME network (wireless)",
+                "Merges item bus and fluid hatch into one block",
+                "Insert an AE2 storage cell to set buffer capacity / partition",
+                "Right click with AE2 Memory Card (bound to a WAP) to connect",
+                "Screwdriver right click to unbind the WAP", "Wire cutter right click to toggle connection sides" },
+            1);
         this.fluidProvider = new OutputProvider<IAEFluidStack>(createFluidEnvironment(), MAX_CACHE_CAPACITY);
         this.itemProvider = new OutputProvider<IAEItemStack>(createItemEnvironment(), MAX_CACHE_CAPACITY);
         ((OutputProvider<IAEItemStack>) this.itemProvider).setProxyOwner(this.fluidProvider);
@@ -131,9 +142,12 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
 
     @Override
     public boolean onRightclick(IGregTechTileEntity aBaseMetaTileEntity, EntityPlayer aPlayer) {
-        ItemStack held = aPlayer.getHeldItem();
-        if (held != null && MemoryCardHandler.bindHatchFromCard(this, held, aPlayer)) {
-            return true;
+        // Memory Card binding only on server side - on client, always fall through to super so GUI opens.
+        if (aBaseMetaTileEntity.isServerSide()) {
+            ItemStack held = aPlayer.getHeldItem();
+            if (held != null && MemoryCardHandler.bindHatchFromCard(this, held, aPlayer)) {
+                return true;
+            }
         }
         lastClickedPlayer = aPlayer;
         return super.onRightclick(aBaseMetaTileEntity, aPlayer);
