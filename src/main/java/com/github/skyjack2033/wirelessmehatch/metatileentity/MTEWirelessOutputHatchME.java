@@ -182,6 +182,8 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
         if (stack == null) return false;
         IAEItemStack aeStack = AEItemStack.create(stack);
         if (aeStack == null) return false;
+        com.github.skyjack2033.wirelessmehatch.WirelessMEHatch.LOG
+            .info("storePartial item: {} x{}, simulate={}", stack.getUnlocalizedName(), stack.stackSize, simulate);
         itemProvider.storePartial(aeStack, simulate);
         // storePartial mutates the AE stack's size to the remainder; mirror GT by writing it back onto the ItemStack.
         stack.stackSize = (int) aeStack.getStackSize();

@@ -179,6 +179,38 @@ public class MTEMultiBlockBaseMixin {
         }
     }
 
+    // ---------------- Atomic output dispatch ----------------
+
+    /**
+     * After {@code addOutputAtomic(ItemStack)} has dispatched to the regular output busses, feed the remainder to the
+     * dual output hatches. If our hatches consumed everything, override the return value to true.
+     */
+    @Inject(method = "addOutputAtomic(Lnet/minecraft/item/ItemStack;)Z", at = @At("TAIL"), cancellable = true)
+    private void wirelessmehatch$onAddOutputAtomicItem(ItemStack aStack, CallbackInfoReturnable<Boolean> cir) {
+        if (wirelessmehatch$mDualOutputHatches.isEmpty() || aStack == null || aStack.stackSize <= 0) {
+            return;
+        }
+        wirelessmehatch$dispatchItem(aStack);
+        if (aStack.stackSize <= 0) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    /**
+     * After {@code addOutputAtomic(FluidStack)} has dispatched to the regular output hatches, feed the remainder to the
+     * dual output hatches. If our hatches consumed everything, override the return value to true.
+     */
+    @Inject(method = "addOutputAtomic(Lnet/minecraftforge/fluids/FluidStack;)Z", at = @At("TAIL"), cancellable = true)
+    private void wirelessmehatch$onAddOutputAtomicFluid(FluidStack aFluid, CallbackInfoReturnable<Boolean> cir) {
+        if (wirelessmehatch$mDualOutputHatches.isEmpty() || aFluid == null || aFluid.amount <= 0) {
+            return;
+        }
+        wirelessmehatch$dispatchFluid(aFluid);
+        // We can't easily check if fluid was fully consumed (dispatchFluid works on a copy), so always return true
+        // since our hatches have Long.MAX_VALUE capacity.
+        cir.setReturnValue(true);
+    }
+
     // ---------------- Helpers ----------------
 
     /**
