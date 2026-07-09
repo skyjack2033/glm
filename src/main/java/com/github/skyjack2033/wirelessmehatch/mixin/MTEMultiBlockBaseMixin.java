@@ -54,7 +54,7 @@ import gregtech.api.metatileentity.implementations.MTEMultiBlockBase;
  * names match the source directly.
  */
 @Mixin(value = MTEMultiBlockBase.class, remap = false)
-public class MTEMultiBlockBaseMixin {
+public class MTEMultiBlockBaseMixin implements MTEMultiBlockBaseMixinAccessor {
 
     /**
      * Registered dual output hatches for this controller. Cleared in {@code clearHatches} alongside the native lists.
@@ -62,6 +62,11 @@ public class MTEMultiBlockBaseMixin {
      */
     @Unique
     private final List<IDualOutputHatch> wirelessmehatch$mDualOutputHatches = new ArrayList<>();
+
+    @Override
+    public List<?> wirelessmehatch$getDualOutputHatches() {
+        return wirelessmehatch$mDualOutputHatches;
+    }
 
     // ---------------- Registration ----------------
 
