@@ -622,7 +622,26 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
         };
     }
 
-    // ---- GUI (deferred to Task 9) ----
+    // ---- Textures (ME overlay, matching MTEHatchOutputME) ----
+
+    @Override
+    public gregtech.api.interfaces.ITexture[] getTexturesActive(gregtech.api.interfaces.ITexture aBaseTexture) {
+        return new gregtech.api.interfaces.ITexture[] { aBaseTexture, gregtech.api.render.TextureFactory
+            .of(gregtech.api.enums.Textures.BlockIcons.OVERLAY_ME_FLUID_HATCH_ACTIVE) };
+    }
+
+    @Override
+    public gregtech.api.interfaces.ITexture[] getTexturesInactive(gregtech.api.interfaces.ITexture aBaseTexture) {
+        return new gregtech.api.interfaces.ITexture[] { aBaseTexture,
+            gregtech.api.render.TextureFactory.of(gregtech.api.enums.Textures.BlockIcons.OVERLAY_ME_FLUID_HATCH) };
+    }
+
+    @Override
+    public byte getTierForStructure() {
+        return (byte) (gregtech.api.enums.GTValues.V.length - 2);
+    }
+
+    // ---- GUI ----
 
     @Override
     protected boolean useMui2() {

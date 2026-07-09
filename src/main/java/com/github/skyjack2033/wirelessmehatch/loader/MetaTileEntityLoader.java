@@ -17,11 +17,11 @@ public final class MetaTileEntityLoader {
     public static void register() {
         GregTechAPI.METATILEENTITIES[WIRELESS_OUTPUT_HATCH_ME_ID] = new MTEWirelessOutputHatchME(
             WIRELESS_OUTPUT_HATCH_ME_ID,
-            "wirelessmehatch.output_hatch_me",
+            "hatch.output.me.wireless",
             "Wireless Output Hatch (ME)");
         GregTechAPI.METATILEENTITIES[WIRELESS_INPUT_HATCH_ME_ID] = new MTEWirelessInputHatchME(
             WIRELESS_INPUT_HATCH_ME_ID,
-            "wirelessmehatch.input_hatch_me",
+            "hatch.input.me.wireless",
             "Wireless Input Hatch (ME)");
     }
 }
