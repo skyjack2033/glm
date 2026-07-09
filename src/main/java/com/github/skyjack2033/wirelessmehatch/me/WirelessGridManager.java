@@ -1,55 +1,51 @@
 package com.github.skyjack2033.wirelessmehatch.me;
 
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.world.World;
+import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.common.util.ForgeDirection;
+
+import org.apache.logging.log4j.LogManager;
 
 import appeng.api.AEApi;
 import appeng.api.exceptions.FailedConnection;
-import appeng.api.features.ILocatable;
 import appeng.api.networking.IGridConnection;
 import appeng.api.networking.IGridHost;
 import appeng.api.networking.IGridNode;
 import appeng.me.helpers.AENetworkProxy;
 import appeng.me.helpers.IGridProxyable;
-import cpw.mods.fml.common.FMLLog;
 
 /**
- * Manages a wireless (invisible) grid connection between a hatch's own {@link AENetworkProxy} node and a bound AE2
- * Wireless Access Point's node, using {@code AEApi.instance().createGridConnection}. Cross-dimension capable; no range
- * check.
- *
- * Lifecycle mirrors AE2's QuantumBridge / P2P ME tunnel pattern: hold the IGridConnection, verify on tick, destroy on
- * invalidate or rebind.
+ * Manages a wireless (invisible) grid connection between a hatch's own {@link AENetworkProxy} node and a bound AE2 ME
+ * Controller, using {@code AEApi.instance().createGridConnection}. The controller is identified by its world
+ * coordinates (dim, x, y, z), stored in NBT.
  *
  * <p>
- * Connection liveness (I1): AE2 may destroy a grid connection remotely (e.g. when the WAP is broken, its chunk unloads,
- * or the grid splits) without notifying this manager. To detect this, {@link #tickCheck()} re-validates the stored
- * connection each tick by re-resolving the bound WAP serial and comparing the connection's two endpoint nodes against
- * the live nodes of both endpoints - the same pattern AE2's {@code QuantumCluster.updateStatus} uses. If the connection
- * is stale, it is torn down so the next tick re-establishes it.
- * </p>
- *
- * <p>
- * Callback coalescing (I4): internal destroy→establish sequences (rebind, reconnect) temporarily suppress
- * {@link #onConnectionChanged} and fire it exactly once based on the net connectivity change, avoiding the previous
- * double-fire on rebind.
+ * Lifecycle: on {@code bind()}, the connection is established immediately. On {@code tickCheck()} (throttled to once
+ * per second), the connection is re-validated; if stale, it is torn down and re-established on the next tick. On
+ * {@code invalidate()} (tile removal / chunk unload), the connection is destroyed.
  * </p>
  */
 public class WirelessGridManager {
 
-    private static final String NBT_KEY = "boundWapSerial";
+    private static final String NBT_KEY_BOUND = "bound";
+    private static final String NBT_KEY_DIM = "ctrlDim";
+    private static final String NBT_KEY_X = "ctrlX";
+    private static final String NBT_KEY_Y = "ctrlY";
+    private static final String NBT_KEY_Z = "ctrlZ";
 
     private final IGridProxyable host;
     private final Runnable onConnectionChanged;
-    private long boundWapSerial = 0L;
+
+    private int ctrlDim = 0;
+    private int ctrlX = 0;
+    private int ctrlY = 0;
+    private int ctrlZ = 0;
+    private boolean bound = false;
+
     private IGridConnection connection;
     private int checkCooldown = 0;
-
-    /**
-     * While true, {@link #notifyConnectionChanged()} is a no-op. Used during internal destroy→establish sequences so
-     * the
-     * callback fires once per net state change rather than once per internal step.
-     */
     private boolean suppressCallback = false;
 
     public WirelessGridManager(IGridProxyable host, Runnable onConnectionChanged) {
@@ -57,26 +53,33 @@ public class WirelessGridManager {
         this.onConnectionChanged = onConnectionChanged;
     }
 
-    /** @return the bound WAP serial, or 0 if unbound. */
+    /** @return packed coordinates as a long (for IWirelessMEHatch.getBoundWapSerial compatibility). */
     public long getBoundWapSerial() {
-        return boundWapSerial;
+        if (!bound) return 0L;
+        return ((long) (ctrlDim & 0xFF) << 48) | ((long) (ctrlX & 0xFFFF) << 32)
+            | ((long) (ctrlY & 0xFF) << 16)
+            | (long) (ctrlZ & 0xFFFF);
     }
 
-    /** @return true if an active grid connection to the bound network currently exists. */
+    /** @return true if an active grid connection exists. */
     public boolean isConnected() {
         return connection != null;
     }
 
-    /** Bind to a WAP serial (0 to unbind). Re-establishes the connection if already connected. */
-    public void bind(long serial) {
-        if (serial == boundWapSerial) return;
+    /** Bind to an ME Controller at the given world coordinates. Pass all-zeros to unbind. */
+    public void bind(int dim, int x, int y, int z) {
         boolean wasConnected = connection != null;
-        // Suppress the per-step callback: fire once at the end based on the net change.
         suppressCallback = true;
         try {
             destroyConnection();
-            boundWapSerial = serial;
-            establishConnection();
+            ctrlDim = dim;
+            ctrlX = x;
+            ctrlY = y;
+            ctrlZ = z;
+            bound = (dim != 0 || x != 0 || y != 0 || z != 0);
+            if (bound) {
+                establishConnection();
+            }
         } finally {
             suppressCallback = false;
         }
@@ -85,38 +88,39 @@ public class WirelessGridManager {
         }
     }
 
-    /** Unbind and tear down the connection. */
-    public void unbind() {
-        bind(0L);
+    /** Legacy bind via packed serial (for IWirelessMEHatch.setBoundWapSerial). */
+    public void bind(long serial) {
+        if (serial == 0L) {
+            bind(0, 0, 0, 0);
+            return;
+        }
+        int dim = (int) ((serial >> 48) & 0xFF);
+        int x = (int) ((serial >> 32) & 0xFFFF);
+        int y = (int) ((serial >> 16) & 0xFF);
+        int z = (int) (serial & 0xFFFF);
+        if (x > 32767) x -= 65536;
+        if (z > 32767) z -= 65536;
+        bind(dim, x, y, z);
     }
 
-    /**
-     * Called every tile tick (throttled internally) to verify and re-establish the connection.
-     *
-     * <p>
-     * When a connection already exists, it is re-validated: the bound WAP is re-resolved and the connection's endpoint
-     * nodes are compared against the live nodes of both endpoints (mirroring {@code QuantumCluster.updateStatus}). If
-     * the connection is stale (WAP gone, not an IGridHost, or its node changed), it is torn down and the callback is
-     * fired; the next tick re-establishes it.
-     * </p>
-     */
+    /** Unbind and tear down the connection. */
+    public void unbind() {
+        bind(0, 0, 0, 0);
+    }
+
+    /** Called every tile tick (throttled) to verify and re-establish the connection. */
     public void tickCheck() {
         if (checkCooldown-- > 0) return;
-        checkCooldown = 20; // check once per second
-        if (boundWapSerial == 0L) return;
+        checkCooldown = 20;
+        if (!bound) return;
         if (connection == null) {
             establishConnection();
             return;
         }
         if (!isConnectionAlive()) {
-            // AE2 destroyed the connection remotely (or the WAP/node changed). Tear down our stale reference so the
-            // next tick re-establishes, and notify the host that connectivity changed. destroy() is best-effort: if AE2
-            // already tore the connection down, the call may no-op or throw, so guard it.
             try {
                 connection.destroy();
-            } catch (Exception ignored) {
-                // Connection was already destroyed remotely - nothing to clean up.
-            }
+            } catch (Exception ignored) {}
             connection = null;
             notifyConnectionChanged();
         }
@@ -128,58 +132,42 @@ public class WirelessGridManager {
     }
 
     public void writeToNBT(NBTTagCompound tag) {
-        tag.setLong(NBT_KEY, boundWapSerial);
+        tag.setBoolean(NBT_KEY_BOUND, bound);
+        tag.setInteger(NBT_KEY_DIM, ctrlDim);
+        tag.setInteger(NBT_KEY_X, ctrlX);
+        tag.setInteger(NBT_KEY_Y, ctrlY);
+        tag.setInteger(NBT_KEY_Z, ctrlZ);
     }
 
     public void readFromNBT(NBTTagCompound tag) {
-        boundWapSerial = tag.getLong(NBT_KEY);
+        bound = tag.getBoolean(NBT_KEY_BOUND);
+        ctrlDim = tag.getInteger(NBT_KEY_DIM);
+        ctrlX = tag.getInteger(NBT_KEY_X);
+        ctrlY = tag.getInteger(NBT_KEY_Y);
+        ctrlZ = tag.getInteger(NBT_KEY_Z);
     }
 
-    /**
-     * Re-resolve the bound WAP and verify the stored connection still binds the live nodes of both endpoints. Mirrors
-     * {@code QuantumCluster.updateStatus}: if the WAP is gone, is no longer an {@link IGridHost}, or either endpoint's
-     * current node no longer matches the connection's recorded nodes, the connection is considered stale.
-     *
-     * @return true if {@link #connection} still appears to be a valid, live link; false if AE2 tore it down remotely.
-     */
     private boolean isConnectionAlive() {
         if (connection == null) return false;
-        ILocatable target = AEApi.instance()
-            .registries()
-            .locatable()
-            .getLocatableBy(boundWapSerial);
-        if (!(target instanceof IGridHost gridHost)) {
-            return false; // WAP not loaded / destroyed remotely.
-        }
-        IGridNode remoteNode = gridHost.getGridNode(ForgeDirection.UNKNOWN);
+        IGridNode remoteNode = resolveControllerNode();
         IGridNode localNode = getLocalNode();
-        if (remoteNode == null || localNode == null) {
-            // Cannot re-resolve an endpoint - the connection cannot be trusted.
-            return false;
-        }
-        // The connection records exactly the two nodes it links (a()/b()). If either endpoint's live node no longer
-        // matches, AE2 has rebuilt the grid out from under us (e.g. the WAP was replaced).
+        if (remoteNode == null || localNode == null) return false;
         IGridNode connA = connection.a();
         IGridNode connB = connection.b();
-        boolean endpointsMatch = (connA == localNode && connB == remoteNode)
-            || (connA == remoteNode && connB == localNode);
-        return endpointsMatch;
+        return (connA == localNode && connB == remoteNode) || (connA == remoteNode && connB == localNode);
     }
 
     private void establishConnection() {
-        if (boundWapSerial == 0L) return;
+        if (!bound) return;
         boolean wasConnected = connection != null;
         destroyConnection();
-        ILocatable target = AEApi.instance()
-            .registries()
-            .locatable()
-            .getLocatableBy(boundWapSerial);
-        if (!(target instanceof IGridHost gridHost)) {
-            return; // WAP not loaded / destroyed - will retry on next tickCheck
-        }
-        IGridNode remoteNode = gridHost.getGridNode(ForgeDirection.UNKNOWN);
+
+        IGridNode remoteNode = resolveControllerNode();
+        if (remoteNode == null) return;
+
         IGridNode localNode = getLocalNode();
-        if (remoteNode == null || localNode == null) return;
+        if (localNode == null) return;
+
         try {
             connection = AEApi.instance()
                 .createGridConnection(localNode, remoteNode);
@@ -187,29 +175,35 @@ public class WirelessGridManager {
                 notifyConnectionChanged();
             }
         } catch (FailedConnection failed) {
-            // Colour mismatch or security rule - log and leave disconnected; will retry on next tickCheck
-            FMLLog.warning(
-                "[WirelessMEHatch] Failed to establish grid connection to WAP serial %d: %s",
-                boundWapSerial,
-                failed.getMessage());
+            LogManager.getLogger("WirelessMEHatch")
+                .warn(
+                    "Failed to establish grid connection to ME controller at dim={} x={} y={} z={}: {}",
+                    ctrlDim,
+                    ctrlX,
+                    ctrlY,
+                    ctrlZ,
+                    failed.getMessage());
         }
+    }
+
+    private IGridNode resolveControllerNode() {
+        if (!bound) return null;
+        World world = DimensionManager.getWorld(ctrlDim);
+        if (world == null) return null;
+        TileEntity te = world.getTileEntity(ctrlX, ctrlY, ctrlZ);
+        if (!(te instanceof IGridHost gridHost)) return null;
+        return gridHost.getGridNode(ForgeDirection.UNKNOWN);
     }
 
     private void destroyConnection() {
         if (connection != null) {
-            connection.destroy();
+            try {
+                connection.destroy();
+            } catch (Exception ignored) {}
             connection = null;
-            notifyConnectionChanged();
-        }
-    }
-
-    /**
-     * Fire {@link #onConnectionChanged} unless {@link #suppressCallback} is set. This lets internal destroy→establish
-     * sequences coalesce callbacks into a single net-state-change notification.
-     */
-    private void notifyConnectionChanged() {
-        if (!suppressCallback) {
-            onConnectionChanged.run();
+            if (!suppressCallback) {
+                notifyConnectionChanged();
+            }
         }
     }
 
@@ -219,6 +213,12 @@ public class WirelessGridManager {
                 .getNode();
         } catch (Exception ignored) {
             return null;
+        }
+    }
+
+    private void notifyConnectionChanged() {
+        if (!suppressCallback) {
+            onConnectionChanged.run();
         }
     }
 }

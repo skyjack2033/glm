@@ -7,12 +7,9 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.world.World;
 import net.minecraftforge.common.DimensionManager;
-import net.minecraftforge.common.util.ForgeDirection;
 
-import com.github.skyjack2033.wirelessmehatch.WirelessMEHatch;
 import com.github.skyjack2033.wirelessmehatch.api.IWirelessMEHatch;
 
-import appeng.api.AEApi;
 import appeng.api.implementations.items.IMemoryCard;
 import appeng.api.implementations.items.MemoryCardMessages;
 import appeng.api.networking.IGrid;
@@ -86,61 +83,38 @@ public class WapInteractionHandler {
         int y = data.getInteger(DATA_KEY_CTRL_Y);
         int z = data.getInteger(DATA_KEY_CTRL_Z);
 
+        // Verify the controller still exists at the stored coordinates.
         World world = DimensionManager.getWorld(dim);
         if (world == null) {
             card.notifyUser(player, MemoryCardMessages.INVALID_MACHINE);
             return false;
         }
-
         TileEntity te = world.getTileEntity(x, y, z);
-        if (!(te instanceof IGridHost gridHost)) {
+        if (!(te instanceof IGridHost)) {
             card.notifyUser(player, MemoryCardMessages.INVALID_MACHINE);
             return false;
         }
 
-        IGridNode remoteNode = gridHost.getGridNode(ForgeDirection.UNKNOWN);
-        if (remoteNode == null) {
-            card.notifyUser(player, MemoryCardMessages.INVALID_MACHINE);
-            return false;
-        }
-
-        if (!(hatch instanceof IGridProxyable proxyable)) {
-            card.notifyUser(player, MemoryCardMessages.INVALID_MACHINE);
-            return false;
-        }
-
-        IGridNode localNode = proxyable.getProxy()
-            .getNode();
-        if (localNode == null) {
-            card.notifyUser(player, MemoryCardMessages.INVALID_MACHINE);
-            return false;
-        }
-
-        try {
-            AEApi.instance()
-                .createGridConnection(localNode, remoteNode);
-        } catch (Exception failed) {
-            WirelessMEHatch.LOG.warn("Failed to establish grid connection to ME controller: {}", failed.getMessage());
-            card.notifyUser(player, MemoryCardMessages.INVALID_MACHINE);
-            return false;
-        }
-
-        // Apply player identity for AE2 security.
-        if (data.hasKey(DATA_KEY_PLAYER_UUID)) {
+        // Apply player identity for AE2 security before binding.
+        if (hatch instanceof IGridProxyable proxyable && data.hasKey(DATA_KEY_PLAYER_UUID)) {
             try {
-                java.util.UUID uuid = java.util.UUID.fromString(data.getString(DATA_KEY_PLAYER_UUID));
-                String name = data.hasKey(DATA_KEY_PLAYER_NAME) ? data.getString(DATA_KEY_PLAYER_NAME)
-                    : uuid.toString();
-                int playerId = appeng.core.worlddata.WorldData.instance()
-                    .playerData()
-                    .getPlayerID(new com.mojang.authlib.GameProfile(uuid, name));
-                if (playerId != 0) {
-                    localNode.setPlayerID(playerId);
+                IGridNode localNode = proxyable.getProxy()
+                    .getNode();
+                if (localNode != null) {
+                    java.util.UUID uuid = java.util.UUID.fromString(data.getString(DATA_KEY_PLAYER_UUID));
+                    String name = data.hasKey(DATA_KEY_PLAYER_NAME) ? data.getString(DATA_KEY_PLAYER_NAME)
+                        : uuid.toString();
+                    int playerId = appeng.core.worlddata.WorldData.instance()
+                        .playerData()
+                        .getPlayerID(new com.mojang.authlib.GameProfile(uuid, name));
+                    if (playerId != 0) {
+                        localNode.setPlayerID(playerId);
+                    }
                 }
             } catch (Throwable ignored) {}
         }
 
-        // Mark the hatch as bound.
+        // Bind via setBoundWapSerial - WirelessGridManager.unpacks coordinates and establishes the connection.
         hatch.setBoundWapSerial(encodeCoords(dim, x, y, z));
 
         card.notifyUser(player, MemoryCardMessages.SETTINGS_LOADED);
@@ -203,6 +177,8 @@ public class WapInteractionHandler {
     }
 
     private static long encodeCoords(int dim, int x, int y, int z) {
-        return ((long) (dim & 0xFF) << 32) | ((long) (x & 0xFFFF) << 16) | (long) (z & 0xFFFF);
+        return ((long) (dim & 0xFF) << 48) | ((long) (x & 0xFFFF) << 32)
+            | ((long) (y & 0xFF) << 16)
+            | (long) (z & 0xFFFF);
     }
 }
