@@ -129,7 +129,7 @@ public class MTEMultiBlockBaseMixin {
      * enough output space" even though our hatch can accept unlimited items/fluids.
      */
     @Inject(
-        method = "canOutputAll(Lnet/minecraft/item/ItemStack;[Lnet/minecraftforge/fluids/FluidStack;)Z",
+        method = "canOutputAll([Lnet/minecraft/item/ItemStack;[Lnet/minecraftforge/fluids/FluidStack;)Z",
         at = @At("HEAD"),
         cancellable = true)
     private void wirelessmehatch$onCanOutputAll(ItemStack[] items, FluidStack[] fluids,
@@ -139,14 +139,14 @@ public class MTEMultiBlockBaseMixin {
         }
     }
 
-    @Inject(method = "canOutputAll(Lnet/minecraft/item/ItemStack;)Z", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "canOutputAll([Lnet/minecraft/item/ItemStack;)Z", at = @At("HEAD"), cancellable = true)
     private void wirelessmehatch$onCanOutputAllItems(ItemStack[] items, CallbackInfoReturnable<Boolean> cir) {
         if (!wirelessmehatch$mDualOutputHatches.isEmpty()) {
             cir.setReturnValue(true);
         }
     }
 
-    @Inject(method = "canOutputAll(Lnet/minecraftforge/fluids/FluidStack;)Z", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "canOutputAll([Lnet/minecraftforge/fluids/FluidStack;)Z", at = @At("HEAD"), cancellable = true)
     private void wirelessmehatch$onCanOutputAllFluids(FluidStack[] fluids, CallbackInfoReturnable<Boolean> cir) {
         if (!wirelessmehatch$mDualOutputHatches.isEmpty()) {
             cir.setReturnValue(true);
