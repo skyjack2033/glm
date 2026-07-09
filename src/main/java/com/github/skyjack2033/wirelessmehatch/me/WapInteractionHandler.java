@@ -203,17 +203,22 @@ public class WapInteractionHandler {
     }
 
     /**
-     * Get channel usage info from a controller's grid node. Returns {usedChannels, maxChannels}.
+     * Get channel usage info from a controller's grid node. Returns {usedChannels, maxChannels}. When the controller
+     * is online but pathing hasn't calculated max channels yet (e.g. controller is standalone), defaults to 8 (standard
+     * controller capacity). Never returns {0, 0} for a valid online controller.
      */
     private int[] getChannelInfo(IGridNode ctrlNode) {
-        int[] result = new int[] { 0, 0 };
+        int[] result = new int[] { 0, 8 }; // default: 0 used, 8 max (standard controller)
         try {
             IGrid grid = ctrlNode.getGrid();
             if (grid == null) return result;
 
             IPathingGrid pathing = grid.getCache(IPathingGrid.class);
-            if (pathing == null || pathing.getControllerState() == ControllerState.NO_CONTROLLER) {
-                return result;
+            if (pathing == null) return result;
+
+            // If controller state is NO_CONTROLLER, the grid has no controller - abort.
+            if (pathing.getControllerState() == ControllerState.NO_CONTROLLER) {
+                return new int[] { 0, 0 };
             }
 
             // Count nodes that require a channel.
@@ -225,11 +230,12 @@ public class WapInteractionHandler {
             }
 
             // Max channels from the controller node's pathing info.
-            // In AE2 1.7.10, each controller block supports channels based on its tier.
-            // GridNode.getMaxChannels() returns the max for this node's path.
-            int max = 0;
+            int max = 8; // default for a standard controller
             if (ctrlNode instanceof appeng.me.GridNode gn) {
-                max = gn.getMaxChannels();
+                int calculated = gn.getMaxChannels();
+                if (calculated > 0) {
+                    max = calculated;
+                }
             }
 
             result[0] = used;
