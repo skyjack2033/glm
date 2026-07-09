@@ -3,6 +3,7 @@ package com.github.skyjack2033.wirelessmehatch.loader;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 
+import com.github.skyjack2033.wirelessmehatch.Config;
 import com.github.skyjack2033.wirelessmehatch.WirelessMEHatch;
 import com.google.common.base.Optional;
 
@@ -22,7 +23,7 @@ public final class RecipeLoader {
         ItemStack meOutputBus = ItemList.Hatch_Output_Bus_ME.get(1);
         ItemStack quantumSingularity = getAe2QuantumEntangledSingularity();
         ItemStack wirelessOutput = GTModHandler
-            .getModItem("gregtech", "gt.blockmachines", 1, MetaTileEntityLoader.WIRELESS_OUTPUT_HATCH_ME_ID);
+            .getModItem("gregtech", "gt.blockmachines", 1, Config.wirelessOutputHatchMeId);
 
         if (meOutputHatch == null || meOutputBus == null || quantumSingularity == null || wirelessOutput == null) {
             WirelessMEHatch.LOG.warn(
@@ -44,7 +45,7 @@ public final class RecipeLoader {
         ItemStack meInputHatch = ItemList.Hatch_Input_ME.get(1);
         ItemStack meInputBus = ItemList.Hatch_Input_Bus_ME.get(1);
         ItemStack wirelessInput = GTModHandler
-            .getModItem("gregtech", "gt.blockmachines", 1, MetaTileEntityLoader.WIRELESS_INPUT_HATCH_ME_ID);
+            .getModItem("gregtech", "gt.blockmachines", 1, Config.wirelessInputHatchMeId);
 
         if (meInputHatch == null || meInputBus == null || quantumSingularity == null || wirelessInput == null) {
             WirelessMEHatch.LOG.warn(

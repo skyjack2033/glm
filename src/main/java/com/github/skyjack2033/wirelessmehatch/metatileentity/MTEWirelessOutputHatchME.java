@@ -84,12 +84,14 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
             aName,
             aNameRegional,
             TIER,
-            new String[] { "Wireless Output Hatch for Multiblocks",
-                "Stores items and fluids directly into a bound ME network (wireless)",
-                "Merges item bus and fluid hatch into one block",
-                "Insert an AE2 storage cell to set buffer capacity / partition",
-                "Right click with AE2 Memory Card (bound to a WAP) to connect",
-                "Screwdriver right click to unbind the WAP", "Wire cutter right click to toggle connection sides" },
+            new String[] { "Wireless ME Output Hatch for Multiblocks",
+                "Merges fluid output hatch and item output bus into one block",
+                "Connects to your ME network wirelessly - no cables needed",
+                "Stores items and fluids directly into the bound ME network",
+                "Capacity: Unlimited (insert a storage cell for partitioning)", "How to connect:",
+                "  1. Sneak-right-click an AE2 Wireless Access Point with a Memory Card",
+                "  2. Right-click this hatch with the bound Memory Card", "  3. Screwdriver right-click to unbind",
+                "Compatible with all GregTech multiblock machines" },
             1);
         this.fluidProvider = new OutputProvider<IAEFluidStack>(createFluidEnvironment(), MAX_CACHE_CAPACITY);
         this.itemProvider = new OutputProvider<IAEItemStack>(createItemEnvironment(), MAX_CACHE_CAPACITY);

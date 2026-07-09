@@ -114,11 +114,13 @@ public class MTEWirelessInputHatchME extends MTEHatchInput
             aName,
             aNameRegional,
             TIER,
-            new String[] { "Wireless Input Hatch for Multiblocks",
-                "Pulls items and fluids from a bound ME network (wireless)",
-                "Merges item bus and fluid hatch into one block", "16 item and 16 fluid config slots for filtering",
-                "Right click with AE2 Memory Card (bound to a WAP) to connect",
-                "Screwdriver right click to unbind the WAP" });
+            new String[] { "Wireless ME Input Hatch for Multiblocks",
+                "Merges fluid input hatch and item input bus into one block",
+                "Pulls items and fluids from your ME network wirelessly - no cables needed",
+                "16 item and 16 fluid config slots for filtering", "How to connect:",
+                "  1. Sneak-right-click an AE2 Wireless Access Point with a Memory Card",
+                "  2. Right-click this hatch with the bound Memory Card", "  3. Screwdriver right-click to unbind",
+                "Compatible with all GregTech multiblock machines" });
         initSlots();
         this.wirelessManager = new WirelessGridManager(this, this::onWirelessConnectionChanged);
     }
