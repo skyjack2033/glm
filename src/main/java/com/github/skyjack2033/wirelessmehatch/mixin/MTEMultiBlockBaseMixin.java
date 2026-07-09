@@ -16,50 +16,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import com.github.skyjack2033.wirelessmehatch.api.IDualOutputHatch;
 
 import gregtech.api.interfaces.IOutputBus;
-import gregtech.api.interfaces.IOutputHatch;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
-import gregtech.api.metatileentity.implementations.MTEHatch;
-import gregtech.api.metatileentity.implementations.MTEMultiBlockBase;
 
-/**
- * Makes every multiblock controller (anything extending {@link MTEMultiBlockBase}) recognise {@link IDualOutputHatch}
- * (the wireless merged output hatch) as a combined fluid hatch + item output bus, without editing GT source.
- *
- * <p>
- * Strategy, verified by decompiling {@code MTEMultiBlockBase} from the GT5 dev jar (5.09.54.20):
- * <ul>
- * <li><b>Registration:</b> {@code @Inject} at {@code HEAD} of {@code addToMachineList},
- * {@code addOutputHatchToMachineList} and {@code addOutputBusToMachineList}. When the candidate is an
- * {@code IDualOutputHatch} we apply the texture/crafting icon (mirroring how GT handles {@code IDualInputHatch} and the
- * plain output hatch/bus branches), add it to our own {@code mDualOutputHatches} list, and short-circuit the original
- * method by returning {@code true}. This prevents the hatch (which extends {@code MTEHatchOutput}) from also being
- * added
- * to {@code mOutputHatches}, which would double-count its fluid side.</li>
- * <li><b>Dispatch:</b> GT routes item/fluid output through {@code ItemEjectionHelper}/{@code FluidEjectionHelper},
- * which
- * pull their target lists from {@code IVoidable.getOutputBusses()}/{@code getOutputHatches()}. Those return
- * {@code List<IOutputBus>}/{@code List<IOutputHatch>} - our dual hatch implements neither, so it cannot be injected
- * into those lists. Instead we {@code @Inject} at {@code TAIL} of every output-dispatch entry point
- * ({@code addItemOutputs}, {@code addOutputPartial(ItemStack)}, {@code addFluidOutputs}, {@code addOutputPartial(
- * FluidStack)}) and call {@link IDualOutputHatch#storePartial} / {@code fill} directly on each dual hatch, mirroring
- * the
- * per-stack/per-fluid dispatch the helpers perform for the regular hatches.</li>
- * <li><b>Clearing:</b> {@code @Inject} at {@code HEAD} of {@code clearHatches} clears {@code mDualOutputHatches}, so
- * the
- * list is rebuilt on every structure re-scan just like the native hatch lists.</li>
- * </ul>
- *
- * <p>
- * {@code remap = false} because GT ships deobfuscated in both dev and production (GTNH dev jars), so the method/field
- * names match the source directly.
- */
-@Mixin(value = MTEMultiBlockBase.class, remap = false)
+@Mixin(value = gregtech.api.metatileentity.implementations.MTEMultiBlockBase.class, remap = false)
 public class MTEMultiBlockBaseMixin implements MTEMultiBlockBaseMixinAccessor {
 
-    /**
-     * Registered dual output hatches for this controller. Cleared in {@code clearHatches} alongside the native lists.
-     * Held on the mixin-injected instance, so it persists with the controller and is per-controller.
-     */
     @Unique
     private final List<IDualOutputHatch> wirelessmehatch$mDualOutputHatches = new ArrayList<>();
 
@@ -68,293 +29,106 @@ public class MTEMultiBlockBaseMixin implements MTEMultiBlockBaseMixinAccessor {
         return wirelessmehatch$mDualOutputHatches;
     }
 
-    // ---------------- Registration ----------------
-
-    /**
-     * Mirror the {@code IDualInputHatch} branch at the top of {@code addToMachineList}: if the MTE is an
-     * {@link IDualOutputHatch}, texture it, register it, and return {@code true} so the later {@code MTEHatchOutput}
-     * branch does not also add it to {@code mOutputHatches}.
-     */
     @Inject(method = "addToMachineList", at = @At("HEAD"), cancellable = true)
     private void wirelessmehatch$onAddToMachineList(IGregTechTileEntity aTileEntity, int aBaseCasingIndex,
         CallbackInfoReturnable<Boolean> cir) {
-        IDualOutputHatch dual = wirelessmehatch$asDualOutputHatch(aTileEntity);
-        if (dual == null) {
-            return;
+        if (aTileEntity == null || aTileEntity.getMetaTileEntity() == null) return;
+        if (aTileEntity.getMetaTileEntity() instanceof IDualOutputHatch dual) {
+            wirelessmehatch$mDualOutputHatches.add(dual);
+            cir.setReturnValue(true);
         }
-        wirelessmehatch$register(dual, aBaseCasingIndex);
-        cir.setReturnValue(true);
     }
 
-    /**
-     * For controllers that wire their output hatch explicitly via {@code addOutputHatchToMachineList}: intercept the
-     * dual hatch here so it is registered once (and does not fall through to the {@code MTEHatchOutput} branch which
-     * would only register its fluid side).
-     */
-    @Inject(method = "addOutputHatchToMachineList", at = @At("HEAD"), cancellable = true)
-    private void wirelessmehatch$onAddOutputHatchToMachineList(IGregTechTileEntity aTileEntity, int aBaseCasingIndex,
-        CallbackInfoReturnable<Boolean> cir) {
-        IDualOutputHatch dual = wirelessmehatch$asDualOutputHatch(aTileEntity);
-        if (dual == null) {
-            return;
-        }
-        wirelessmehatch$register(dual, aBaseCasingIndex);
-        cir.setReturnValue(true);
-    }
-
-    /**
-     * For controllers that wire their output bus explicitly via {@code addOutputBusToMachineList}: the dual hatch does
-     * not extend {@code MTEHatchOutputBus}, so without this hook it would never receive item output.
-     */
     @Inject(method = "addOutputBusToMachineList", at = @At("HEAD"), cancellable = true)
     private void wirelessmehatch$onAddOutputBusToMachineList(IGregTechTileEntity aTileEntity, int aBaseCasingIndex,
         CallbackInfoReturnable<Boolean> cir) {
-        IDualOutputHatch dual = wirelessmehatch$asDualOutputHatch(aTileEntity);
-        if (dual == null) {
-            return;
+        if (aTileEntity == null || aTileEntity.getMetaTileEntity() == null) return;
+        if (aTileEntity.getMetaTileEntity() instanceof IDualOutputHatch dual) {
+            wirelessmehatch$mDualOutputHatches.add(dual);
+            cir.setReturnValue(true);
         }
-        wirelessmehatch$register(dual, aBaseCasingIndex);
-        cir.setReturnValue(true);
     }
 
-    // ---------------- Clearing ----------------
+    @Inject(method = "addOutputHatchToMachineList", at = @At("HEAD"), cancellable = true)
+    private void wirelessmehatch$onAddOutputHatchToMachineList(IGregTechTileEntity aTileEntity, int aBaseCasingIndex,
+        CallbackInfoReturnable<Boolean> cir) {
+        if (aTileEntity == null || aTileEntity.getMetaTileEntity() == null) return;
+        if (aTileEntity.getMetaTileEntity() instanceof IDualOutputHatch dual) {
+            wirelessmehatch$mDualOutputHatches.add(dual);
+            cir.setReturnValue(true);
+        }
+    }
 
-    /**
-     * Clear our list in lockstep with the native hatch lists so structure re-scans rebuild it from scratch.
-     */
     @Inject(method = "clearHatches", at = @At("HEAD"))
     private void wirelessmehatch$onClearHatches(CallbackInfo ci) {
         wirelessmehatch$mDualOutputHatches.clear();
     }
 
-    // ---------------- Inject dual hatches into native output lists ----------------
+    @Inject(method = "addItemOutputs([Lnet/minecraft/item/ItemStack;)Z", at = @At("TAIL"))
+    private void wirelessmehatch$onAddItemOutputs(ItemStack[] aOutputItems, CallbackInfoReturnable<Boolean> cir) {
+        if (wirelessmehatch$mDualOutputHatches.isEmpty() || aOutputItems == null) return;
+        for (ItemStack stack : aOutputItems) {
+            if (stack == null || stack.stackSize <= 0) continue;
+            for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
+                if (stack.stackSize <= 0) break;
+                dual.storePartial(stack, false);
+            }
+        }
+    }
 
-    /**
-     * Append our dual output hatches to the {@code getOutputBusses()} return list so GT's item output pipeline
-     * (ItemEjectionHelper, VoidProtectionHelper, ParallelHelper) can see them. Without this, items have nowhere to go
-     * because our hatch is not a {@code MTEHatchOutputBus} and thus never enters {@code mOutputBusses}.
-     */
+    @Inject(method = "addFluidOutputs([Lnet/minecraftforge/fluids/FluidStack;)Z", at = @At("TAIL"))
+    private void wirelessmehatch$onAddFluidOutputs(FluidStack[] aOutputFluids, CallbackInfoReturnable<Boolean> cir) {
+        if (wirelessmehatch$mDualOutputHatches.isEmpty() || aOutputFluids == null) return;
+        for (FluidStack fluid : aOutputFluids) {
+            if (fluid == null || fluid.amount <= 0) continue;
+            FluidStack remainder = fluid.copy();
+            for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
+                if (remainder.amount <= 0) break;
+                int accepted = dual.fill(remainder, true);
+                if (accepted > 0) remainder.amount -= accepted;
+            }
+        }
+    }
+
+    @Inject(method = "addOutputPartial(Lnet/minecraft/item/ItemStack;)V", at = @At("TAIL"))
+    private void wirelessmehatch$onAddOutputPartialItem(ItemStack aStack, CallbackInfo ci) {
+        if (wirelessmehatch$mDualOutputHatches.isEmpty() || aStack == null || aStack.stackSize <= 0) return;
+        for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
+            if (aStack.stackSize <= 0) break;
+            dual.storePartial(aStack, false);
+        }
+    }
+
+    @Inject(method = "addOutputPartial(Lnet/minecraftforge/fluids/FluidStack;)V", at = @At("TAIL"))
+    private void wirelessmehatch$onAddOutputPartialFluid(FluidStack aFluid, CallbackInfo ci) {
+        if (wirelessmehatch$mDualOutputHatches.isEmpty() || aFluid == null || aFluid.amount <= 0) return;
+        FluidStack remainder = aFluid.copy();
+        for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
+            if (remainder.amount <= 0) break;
+            int accepted = dual.fill(remainder, true);
+            if (accepted > 0) remainder.amount -= accepted;
+        }
+    }
+
     @Inject(method = "getOutputBusses", at = @At("RETURN"))
     private void wirelessmehatch$onGetOutputBusses(CallbackInfoReturnable<List<IOutputBus>> cir) {
         if (wirelessmehatch$mDualOutputHatches.isEmpty()) return;
         List<IOutputBus> busses = cir.getReturnValue();
-        com.github.skyjack2033.wirelessmehatch.WirelessMEHatch.LOG.info(
-            "getOutputBusses called: {} native busses, {} dual hatches",
-            busses.size(),
-            wirelessmehatch$mDualOutputHatches.size());
         for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
             if (dual instanceof com.github.skyjack2033.wirelessmehatch.metatileentity.MTEWirelessOutputHatchME hatch) {
-                IOutputBus adapter = new com.github.skyjack2033.wirelessmehatch.metatileentity.WirelessOutputBusAdapter(
-                    hatch);
-                busses.add(adapter);
+                busses.add(new com.github.skyjack2033.wirelessmehatch.metatileentity.WirelessOutputBusAdapter(hatch));
             }
         }
     }
 
-    /**
-     * Similarly append to {@code getOutputHatches()} for the fluid side (VoidProtectionHelper fluid checks).
-     */
     @Inject(method = "getOutputHatches", at = @At("RETURN"))
-    private void wirelessmehatch$onGetOutputHatches(CallbackInfoReturnable<List<IOutputHatch>> cir) {
+    private void wirelessmehatch$onGetOutputHatches(
+        CallbackInfoReturnable<java.util.List<gregtech.api.interfaces.IOutputHatch>> cir) {
         if (wirelessmehatch$mDualOutputHatches.isEmpty()) return;
-        List<IOutputHatch> hatches = cir.getReturnValue();
+        java.util.List<gregtech.api.interfaces.IOutputHatch> hatches = cir.getReturnValue();
         for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
-            if (dual instanceof IOutputHatch hatch && !hatches.contains(hatch)) {
+            if (dual instanceof gregtech.api.interfaces.IOutputHatch hatch && !hatches.contains(hatch)) {
                 hatches.add(hatch);
-            }
-        }
-    }
-
-    // ---------------- Void protection bypass ----------------
-
-    /**
-     * When dual output hatches are present (capacity = Long.MAX_VALUE), bypass {@code canOutputAll} entirely. The
-     * native void-protection check only looks at {@code mOutputBusses}/{@code mOutputHatches}, which don't contain our
-     * dual hatch (it's in {@code mDualOutputHatches} instead), so without this bypass the controller would report "not
-     * enough output space" even though our hatch can accept unlimited items/fluids.
-     */
-    @Inject(
-        method = "canOutputAll([Lnet/minecraft/item/ItemStack;[Lnet/minecraftforge/fluids/FluidStack;)Z",
-        at = @At("HEAD"),
-        cancellable = true)
-    private void wirelessmehatch$onCanOutputAll(ItemStack[] items, FluidStack[] fluids,
-        CallbackInfoReturnable<Boolean> cir) {
-        if (!wirelessmehatch$mDualOutputHatches.isEmpty()) {
-            cir.setReturnValue(true);
-        }
-    }
-
-    @Inject(method = "canOutputAll([Lnet/minecraft/item/ItemStack;)Z", at = @At("HEAD"), cancellable = true)
-    private void wirelessmehatch$onCanOutputAllItems(ItemStack[] items, CallbackInfoReturnable<Boolean> cir) {
-        if (!wirelessmehatch$mDualOutputHatches.isEmpty()) {
-            cir.setReturnValue(true);
-        }
-    }
-
-    @Inject(method = "canOutputAll([Lnet/minecraftforge/fluids/FluidStack;)Z", at = @At("HEAD"), cancellable = true)
-    private void wirelessmehatch$onCanOutputAllFluids(FluidStack[] fluids, CallbackInfoReturnable<Boolean> cir) {
-        if (!wirelessmehatch$mDualOutputHatches.isEmpty()) {
-            cir.setReturnValue(true);
-        }
-    }
-
-    // ---------------- Item output dispatch ----------------
-
-    /**
-     * After {@code addItemOutputs(ItemStack[])} has dispatched to the regular output busses (mutating the array's stack
-     * sizes down to the leftovers), feed whatever remains to each dual output hatch via
-     * {@link IDualOutputHatch#storePartial}. Mirrors how {@code ItemEjectionHelper.ejectItems} walks busses: each hatch
-     * sees the running remainder.
-     */
-    @Inject(method = "addItemOutputs", at = @At("TAIL"))
-    private void wirelessmehatch$onAddItemOutputs(ItemStack[] aOutputItems, CallbackInfoReturnable<Boolean> cir) {
-        if (wirelessmehatch$mDualOutputHatches.isEmpty() || aOutputItems == null) {
-            return;
-        }
-        for (ItemStack stack : aOutputItems) {
-            wirelessmehatch$dispatchItem(stack);
-        }
-    }
-
-    /**
-     * After {@code addOutputPartial(ItemStack)} has dispatched the single stack to the regular output busses, feed the
-     * remainder to the dual output hatches.
-     */
-    @Inject(method = "addOutputPartial(Lnet/minecraft/item/ItemStack;)V", at = @At("TAIL"))
-    private void wirelessmehatch$onAddOutputPartialItem(ItemStack aStack, CallbackInfo ci) {
-        if (!wirelessmehatch$mDualOutputHatches.isEmpty()) {
-            wirelessmehatch$dispatchItem(aStack);
-        }
-    }
-
-    // ---------------- Fluid output dispatch ----------------
-
-    /**
-     * After {@code addFluidOutputs(FluidStack[])} has dispatched to the regular output hatches, push whatever remains
-     * of
-     * each fluid to the dual output hatches via {@code fill}. The helper mutates the array stacks to the remainder, so
-     * we iterate the (possibly-depleted) originals.
-     */
-    @Inject(method = "addFluidOutputs([Lnet/minecraftforge/fluids/FluidStack;)Z", at = @At("TAIL"))
-    private void wirelessmehatch$onAddFluidOutputs(FluidStack[] aOutputFluids, CallbackInfoReturnable<Boolean> cir) {
-        if (wirelessmehatch$mDualOutputHatches.isEmpty() || aOutputFluids == null) {
-            return;
-        }
-        for (FluidStack fluid : aOutputFluids) {
-            wirelessmehatch$dispatchFluid(fluid);
-        }
-    }
-
-    /**
-     * After {@code addOutputPartial(FluidStack)} has dispatched the single fluid to the regular output hatches, push
-     * the
-     * remainder to the dual output hatches.
-     */
-    @Inject(method = "addOutputPartial(Lnet/minecraftforge/fluids/FluidStack;)V", at = @At("TAIL"))
-    private void wirelessmehatch$onAddOutputPartialFluid(FluidStack aFluid, CallbackInfo ci) {
-        if (!wirelessmehatch$mDualOutputHatches.isEmpty()) {
-            wirelessmehatch$dispatchFluid(aFluid);
-        }
-    }
-
-    // ---------------- Atomic output dispatch ----------------
-
-    /**
-     * After {@code addOutputAtomic(ItemStack)} has dispatched to the regular output busses, feed the remainder to the
-     * dual output hatches. If our hatches consumed everything, override the return value to true.
-     */
-    @Inject(method = "addOutputAtomic(Lnet/minecraft/item/ItemStack;)Z", at = @At("TAIL"), cancellable = true)
-    private void wirelessmehatch$onAddOutputAtomicItem(ItemStack aStack, CallbackInfoReturnable<Boolean> cir) {
-        if (wirelessmehatch$mDualOutputHatches.isEmpty() || aStack == null || aStack.stackSize <= 0) {
-            return;
-        }
-        wirelessmehatch$dispatchItem(aStack);
-        if (aStack.stackSize <= 0) {
-            cir.setReturnValue(true);
-        }
-    }
-
-    /**
-     * After {@code addOutputAtomic(FluidStack)} has dispatched to the regular output hatches, feed the remainder to the
-     * dual output hatches. If our hatches consumed everything, override the return value to true.
-     */
-    @Inject(method = "addOutputAtomic(Lnet/minecraftforge/fluids/FluidStack;)Z", at = @At("TAIL"), cancellable = true)
-    private void wirelessmehatch$onAddOutputAtomicFluid(FluidStack aFluid, CallbackInfoReturnable<Boolean> cir) {
-        if (wirelessmehatch$mDualOutputHatches.isEmpty() || aFluid == null || aFluid.amount <= 0) {
-            return;
-        }
-        wirelessmehatch$dispatchFluid(aFluid);
-        // We can't easily check if fluid was fully consumed (dispatchFluid works on a copy), so always return true
-        // since our hatches have Long.MAX_VALUE capacity.
-        cir.setReturnValue(true);
-    }
-
-    // ---------------- Helpers ----------------
-
-    /**
-     * @return the {@link IDualOutputHatch} behind {@code aTileEntity}, or {@code null} if the tile is null/invalid or
-     *         not one of our dual hatches.
-     */
-    private static IDualOutputHatch wirelessmehatch$asDualOutputHatch(IGregTechTileEntity aTileEntity) {
-        if (aTileEntity == null || aTileEntity.getMetaTileEntity() == null) {
-            return null;
-        }
-        return aTileEntity.getMetaTileEntity() instanceof IDualOutputHatch dual ? dual : null;
-    }
-
-    /**
-     * Apply the controller's texture index and crafting icon to the hatch (mirrors the {@code IDualInputHatch} branch
-     * in
-     * {@code addToMachineList} which calls {@code updateTexture}/{@code updateCraftingIcon}), then record it. All
-     * concrete dual output hatches extend {@link MTEHatch} (via {@code MTEHatchOutput}), so the cast is safe.
-     */
-    private void wirelessmehatch$register(IDualOutputHatch dual, int aBaseCasingIndex) {
-        // clearHatches runs before re-scan, but be defensive against duplicate registration.
-        if (!wirelessmehatch$mDualOutputHatches.contains(dual)) {
-            wirelessmehatch$mDualOutputHatches.add(dual);
-        }
-        if (dual instanceof MTEHatch hatch) {
-            hatch.updateTexture(aBaseCasingIndex);
-            hatch.updateCraftingIcon(((MTEMultiBlockBase) (Object) this).getMachineCraftingIcon());
-        }
-    }
-
-    /**
-     * Feed {@code stack} (the running remainder) to every dual output hatch in order, mutating it to whatever could not
-     * be stored - matching the per-bus behaviour of {@code ItemEjectionHelper}.
-     */
-    private void wirelessmehatch$dispatchItem(ItemStack stack) {
-        if (stack == null || stack.stackSize <= 0) {
-            return;
-        }
-        for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
-            if (stack.stackSize <= 0) {
-                break;
-            }
-            dual.storePartial(stack, false);
-        }
-    }
-
-    /**
-     * Push {@code fluid} (the running remainder) to every dual output hatch via its side-less {@code fill}. The hatch's
-     * {@code fill} returns the amount accepted without mutating the passed stack, so we decrement a local working copy
-     * and stop once nothing remains - matching {@code FluidEjectionHelper}. The original {@code fluid} is not mutated
-     * so
-     * callers that re-read the array element see the helper-supplied remainder.
-     */
-    private void wirelessmehatch$dispatchFluid(FluidStack fluid) {
-        if (fluid == null || fluid.amount <= 0) {
-            return;
-        }
-        // Work on a copy so we never mutate the caller's array element; report nothing about how much was consumed.
-        FluidStack remainder = fluid.copy();
-        for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
-            if (remainder.amount <= 0) {
-                break;
-            }
-            int accepted = dual.fill(remainder, true);
-            if (accepted > 0) {
-                remainder.amount -= accepted;
             }
         }
     }
