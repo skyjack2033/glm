@@ -8,7 +8,6 @@ import net.minecraft.util.ChatComponentText;
 import net.minecraft.world.World;
 import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.common.util.ForgeDirection;
-import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 
 import com.github.skyjack2033.wirelessmehatch.WirelessMEHatch;
 import com.github.skyjack2033.wirelessmehatch.api.IWirelessMEHatch;
@@ -23,15 +22,12 @@ import appeng.api.networking.IGridNode;
 import appeng.api.networking.pathing.ControllerState;
 import appeng.api.networking.pathing.IPathingGrid;
 import appeng.me.helpers.IGridProxyable;
-import appeng.tile.networking.TileController;
-import cpw.mods.fml.common.eventhandler.Event;
-import cpw.mods.fml.common.eventhandler.EventPriority;
-import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 
 /**
  * Handles the wireless ME binding flow via AE2 Memory Card:
  *
  * 1. Sneak-right-click an AE2 ME Controller with a Memory Card -> record controller coordinates + player identity.
+ * (Implemented via ToolMemoryCardMixin to intercept AE2's own clear-on-sneak behavior.)
  * 2. Right-click a wireless hatch with the bound card -> establish a grid connection to the controller.
  * 3. After binding, the card data is cleared (one-time use per binding).
  * 4. Screwdriver-right-click a wireless hatch -> unbind, and clear the card data if held.
@@ -47,53 +43,28 @@ public class WapInteractionHandler {
     private static final String DATA_KEY_PLAYER_UUID = "playerUUID";
 
     /**
-     * High-priority handler: intercepts sneak-right-click on ME Controller with a Memory Card BEFORE AE2's own
-     * ToolMemoryCard.onItemUse can process (and clear) the card. By setting both useBlock and useItem to DENY at
-     * HIGHEST priority, we prevent AE2 from seeing the interaction at all.
+     * Called from ToolMemoryCardMixin when a player sneak-right-clicks an ME Controller with a Memory Card. Records
+     * controller coordinates + player identity onto the card, replacing AE2's default clear behavior.
      */
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public void onPlayerInteract(PlayerInteractEvent event) {
-        if (event.action != PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK) return;
-        if (!event.entityPlayer.isSneaking()) return;
-
-        ItemStack held = event.entityPlayer.getHeldItem();
-        if (held == null || !(held.getItem() instanceof IMemoryCard)) return;
-
-        TileEntity te = event.world.getTileEntity(event.x, event.y, event.z);
-        if (!(te instanceof TileController)) return;
-
-        // Fully cancel the interaction BEFORE AE2's ToolMemoryCard can process it.
-        // This prevents AE2 from clearing the card data (its sneak-right-click-on-block behavior).
-        event.setCanceled(true);
-        event.useBlock = Event.Result.DENY;
-        event.useItem = Event.Result.DENY;
-
-        // Only process on server side - client just sees the cancellation.
-        if (event.world.isRemote) return;
-
-        IGridHost gridHost = (IGridHost) te;
-        IGridNode ctrlNode = gridHost.getGridNode(ForgeDirection.UNKNOWN);
-        if (ctrlNode == null) return;
-
-        // Record controller coordinates and player identity onto the memory card.
-        IMemoryCard card = (IMemoryCard) held.getItem();
+    public static void recordController(ItemStack cardStack, IGridNode ctrlNode, TileEntity controllerTe,
+        EntityPlayer player) {
+        IMemoryCard card = (IMemoryCard) cardStack.getItem();
         NBTTagCompound data = new NBTTagCompound();
-        data.setInteger(DATA_KEY_CTRL_DIM, te.getWorldObj().provider.dimensionId);
-        data.setInteger(DATA_KEY_CTRL_X, te.xCoord);
-        data.setInteger(DATA_KEY_CTRL_Y, te.yCoord);
-        data.setInteger(DATA_KEY_CTRL_Z, te.zCoord);
-        data.setString(DATA_KEY_PLAYER_NAME, event.entityPlayer.getCommandSenderName());
+        data.setInteger(DATA_KEY_CTRL_DIM, controllerTe.getWorldObj().provider.dimensionId);
+        data.setInteger(DATA_KEY_CTRL_X, controllerTe.xCoord);
+        data.setInteger(DATA_KEY_CTRL_Y, controllerTe.yCoord);
+        data.setInteger(DATA_KEY_CTRL_Z, controllerTe.zCoord);
+        data.setString(DATA_KEY_PLAYER_NAME, player.getCommandSenderName());
         data.setString(
             DATA_KEY_PLAYER_UUID,
-            event.entityPlayer.getUniqueID()
+            player.getUniqueID()
                 .toString());
-        card.setMemoryCardContents(held, CONFIG_KEY, data);
-        card.notifyUser(event.entityPlayer, MemoryCardMessages.SETTINGS_SAVED);
+        card.setMemoryCardContents(cardStack, CONFIG_KEY, data);
+        card.notifyUser(player, MemoryCardMessages.SETTINGS_SAVED);
 
         // Show channel info to the player (using the efficient AE2/Waila method).
         String channelInfo = getChannelInfoString(ctrlNode);
-        event.entityPlayer
-            .addChatMessage(new ChatComponentText("\u00A7a[Wireless ME Hatch] ME Controller bound." + channelInfo));
+        player.addChatMessage(new ChatComponentText("\u00A7a[Wireless ME Hatch] ME Controller bound." + channelInfo));
     }
 
     /**
@@ -195,10 +166,7 @@ public class WapInteractionHandler {
 
     /**
      * Get channel info string using the AE2/Waila official method: only inspect the controller node's direct
-     * connections (O(connections), typically 1-6), NOT the entire grid. This is the same pattern used by
-     * {@code IUsedChannelProvider} and {@code TileWirelessBase.getUsedChannels()}.
-     *
-     * Returns a string like " Channels: 3/8 (remaining: 5)" or " Channels: disabled".
+     * connections (O(connections), typically 1-6), NOT the entire grid.
      */
     private static String getChannelInfoString(IGridNode ctrlNode) {
         try {
@@ -234,9 +202,6 @@ public class WapInteractionHandler {
         }
     }
 
-    /**
-     * Encode controller coordinates into a single long for IWirelessMEHatch.setBoundWapSerial.
-     */
     private static long encodeCoords(int dim, int x, int y, int z) {
         return ((long) (dim & 0xFF) << 32) | ((long) (x & 0xFFFF) << 16) | (long) (z & 0xFFFF);
     }
