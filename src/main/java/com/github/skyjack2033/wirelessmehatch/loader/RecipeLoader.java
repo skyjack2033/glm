@@ -4,20 +4,14 @@ import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 
 import com.github.skyjack2033.wirelessmehatch.WirelessMEHatch;
+import com.google.common.base.Optional;
 
+import appeng.api.AEApi;
+import appeng.api.definitions.IItemDefinition;
 import gregtech.api.enums.ItemList;
 import gregtech.api.util.GTModHandler;
 
 public final class RecipeLoader {
-
-    /**
-     * AE2 quantum entangled singularity. Looked up directly from AE2 since GT does not expose it through
-     * {@link ItemList}. The item name/meta (item.ItemMultiMaterial:36) is the AE2 1.7.10 registration for the entangled
-     * singularity - flagged for verification at runtime (AE2 dev jar was not in cache for static verification).
-     */
-    private static final String AE2_MOD_ID = "appliedenergistics2";
-    private static final String AE2_MULTI_MATERIAL = "item.ItemMultiMaterial";
-    private static final int AE2_META_ENTANGLED_SINGULARITY = 36;
 
     private RecipeLoader() {}
 
@@ -26,8 +20,7 @@ public final class RecipeLoader {
         // circuit
         ItemStack meOutputHatch = ItemList.Hatch_Output_ME.get(1);
         ItemStack meOutputBus = ItemList.Hatch_Output_Bus_ME.get(1);
-        ItemStack quantumSingularity = GTModHandler
-            .getModItem(AE2_MOD_ID, AE2_MULTI_MATERIAL, 1, AE2_META_ENTANGLED_SINGULARITY);
+        ItemStack quantumSingularity = getAe2QuantumEntangledSingularity();
         ItemStack wirelessOutput = GTModHandler
             .getModItem("gregtech", "gt.blockmachines", 1, MetaTileEntityLoader.WIRELESS_OUTPUT_HATCH_ME_ID);
 
@@ -68,5 +61,27 @@ public final class RecipeLoader {
                 new Object[] { "ABA", "CDC", "AEA", 'A', meInputHatch, 'B', meInputBus, 'C', quantumSingularity, 'D',
                     ItemList.Circuit_Advanced.get(1), 'E', Items.ender_eye });
         }
+    }
+
+    /**
+     * Get the AE2 Quantum Entangled Singularity via AE2's official definitions API, avoiding fragile hardcoded
+     * item-name/meta lookups. Falls back to null if AE2 is not loaded or the item is unavailable.
+     */
+    private static ItemStack getAe2QuantumEntangledSingularity() {
+        try {
+            IItemDefinition qeSingularity = AEApi.instance()
+                .definitions()
+                .materials()
+                .qESingularity();
+            if (qeSingularity != null && qeSingularity.isEnabled()) {
+                Optional<ItemStack> stack = qeSingularity.maybeStack(1);
+                if (stack.isPresent()) {
+                    return stack.get();
+                }
+            }
+        } catch (Throwable t) {
+            WirelessMEHatch.LOG.warn("Failed to get AE2 Quantum Entangled Singularity via API: {}", t.toString());
+        }
+        return null;
     }
 }
