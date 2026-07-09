@@ -133,13 +133,15 @@ public class MTEMultiBlockBaseMixin {
     private void wirelessmehatch$onGetOutputBusses(CallbackInfoReturnable<List<IOutputBus>> cir) {
         if (wirelessmehatch$mDualOutputHatches.isEmpty()) return;
         List<IOutputBus> busses = cir.getReturnValue();
+        com.github.skyjack2033.wirelessmehatch.WirelessMEHatch.LOG.info(
+            "getOutputBusses called: {} native busses, {} dual hatches",
+            busses.size(),
+            wirelessmehatch$mDualOutputHatches.size());
         for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
             if (dual instanceof com.github.skyjack2033.wirelessmehatch.metatileentity.MTEWirelessOutputHatchME hatch) {
                 IOutputBus adapter = new com.github.skyjack2033.wirelessmehatch.metatileentity.WirelessOutputBusAdapter(
                     hatch);
-                if (!busses.contains(adapter)) {
-                    busses.add(adapter);
-                }
+                busses.add(adapter);
             }
         }
     }
