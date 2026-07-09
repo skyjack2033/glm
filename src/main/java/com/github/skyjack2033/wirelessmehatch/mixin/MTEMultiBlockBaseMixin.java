@@ -120,6 +120,39 @@ public class MTEMultiBlockBaseMixin {
         wirelessmehatch$mDualOutputHatches.clear();
     }
 
+    // ---------------- Void protection bypass ----------------
+
+    /**
+     * When dual output hatches are present (capacity = Long.MAX_VALUE), bypass {@code canOutputAll} entirely. The
+     * native void-protection check only looks at {@code mOutputBusses}/{@code mOutputHatches}, which don't contain our
+     * dual hatch (it's in {@code mDualOutputHatches} instead), so without this bypass the controller would report "not
+     * enough output space" even though our hatch can accept unlimited items/fluids.
+     */
+    @Inject(
+        method = "canOutputAll(Lnet/minecraft/item/ItemStack;[Lnet/minecraftforge/fluids/FluidStack;)Z",
+        at = @At("HEAD"),
+        cancellable = true)
+    private void wirelessmehatch$onCanOutputAll(ItemStack[] items, FluidStack[] fluids,
+        CallbackInfoReturnable<Boolean> cir) {
+        if (!wirelessmehatch$mDualOutputHatches.isEmpty()) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    @Inject(method = "canOutputAll(Lnet/minecraft/item/ItemStack;)Z", at = @At("HEAD"), cancellable = true)
+    private void wirelessmehatch$onCanOutputAllItems(ItemStack[] items, CallbackInfoReturnable<Boolean> cir) {
+        if (!wirelessmehatch$mDualOutputHatches.isEmpty()) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    @Inject(method = "canOutputAll(Lnet/minecraftforge/fluids/FluidStack;)Z", at = @At("HEAD"), cancellable = true)
+    private void wirelessmehatch$onCanOutputAllFluids(FluidStack[] fluids, CallbackInfoReturnable<Boolean> cir) {
+        if (!wirelessmehatch$mDualOutputHatches.isEmpty()) {
+            cir.setReturnValue(true);
+        }
+    }
+
     // ---------------- Item output dispatch ----------------
 
     /**
