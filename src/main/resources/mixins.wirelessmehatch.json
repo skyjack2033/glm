@@ -7,8 +7,7 @@
   "compatibilityLevel": "JAVA_8",
   "mixins": [
     "MTEMultiBlockBaseMixin",
-    "ToolMemoryCardMixin",
-    "VoidProtectionHelperMixin"
+    "ToolMemoryCardMixin"
   ],
   "client": [],
   "server": []
