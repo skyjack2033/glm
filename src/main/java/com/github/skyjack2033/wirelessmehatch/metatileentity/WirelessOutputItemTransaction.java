@@ -54,12 +54,9 @@ public class WirelessOutputItemTransaction implements IOutputBusTransaction, IOu
                 StorageChannel.ITEMS);
     }
 
-    /**
-     * @return {@code null}; this hatch is not a standalone {@link IOutputBus} (see class javadoc).
-     */
     @Override
     public IOutputBus getBus() {
-        return null;
+        return new WirelessOutputBusAdapter(hatch);
     }
 
     @Override

@@ -15,6 +15,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.github.skyjack2033.wirelessmehatch.api.IDualOutputHatch;
 
+import gregtech.api.interfaces.IOutputBus;
+import gregtech.api.interfaces.IOutputHatch;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.metatileentity.implementations.MTEHatch;
 import gregtech.api.metatileentity.implementations.MTEMultiBlockBase;
@@ -118,6 +120,42 @@ public class MTEMultiBlockBaseMixin {
     @Inject(method = "clearHatches", at = @At("HEAD"))
     private void wirelessmehatch$onClearHatches(CallbackInfo ci) {
         wirelessmehatch$mDualOutputHatches.clear();
+    }
+
+    // ---------------- Inject dual hatches into native output lists ----------------
+
+    /**
+     * Append our dual output hatches to the {@code getOutputBusses()} return list so GT's item output pipeline
+     * (ItemEjectionHelper, VoidProtectionHelper, ParallelHelper) can see them. Without this, items have nowhere to go
+     * because our hatch is not a {@code MTEHatchOutputBus} and thus never enters {@code mOutputBusses}.
+     */
+    @Inject(method = "getOutputBusses", at = @At("RETURN"))
+    private void wirelessmehatch$onGetOutputBusses(CallbackInfoReturnable<List<IOutputBus>> cir) {
+        if (wirelessmehatch$mDualOutputHatches.isEmpty()) return;
+        List<IOutputBus> busses = cir.getReturnValue();
+        for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
+            if (dual instanceof com.github.skyjack2033.wirelessmehatch.metatileentity.MTEWirelessOutputHatchME hatch) {
+                IOutputBus adapter = new com.github.skyjack2033.wirelessmehatch.metatileentity.WirelessOutputBusAdapter(
+                    hatch);
+                if (!busses.contains(adapter)) {
+                    busses.add(adapter);
+                }
+            }
+        }
+    }
+
+    /**
+     * Similarly append to {@code getOutputHatches()} for the fluid side (VoidProtectionHelper fluid checks).
+     */
+    @Inject(method = "getOutputHatches", at = @At("RETURN"))
+    private void wirelessmehatch$onGetOutputHatches(CallbackInfoReturnable<List<IOutputHatch>> cir) {
+        if (wirelessmehatch$mDualOutputHatches.isEmpty()) return;
+        List<IOutputHatch> hatches = cir.getReturnValue();
+        for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
+            if (dual instanceof IOutputHatch hatch && !hatches.contains(hatch)) {
+                hatches.add(hatch);
+            }
+        }
     }
 
     // ---------------- Void protection bypass ----------------

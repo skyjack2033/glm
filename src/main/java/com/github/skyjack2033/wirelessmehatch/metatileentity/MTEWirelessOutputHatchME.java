@@ -200,6 +200,25 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
         return new WirelessOutputItemTransaction(this);
     }
 
+    // ---- Item bus helper methods (used by WirelessOutputBusAdapter) ----
+
+    public boolean isFiltered() {
+        return itemProvider.isFiltered();
+    }
+
+    public boolean isFilteredToItem(gregtech.api.util.GTUtility.ItemId itemId) {
+        IAEItemStack aeStack = AEItemStack.create(itemId.getItemStack());
+        return aeStack != null && itemProvider.canStore(aeStack);
+    }
+
+    public gregtech.api.enums.OutputBusType getBusType() {
+        return gregtech.api.enums.OutputBusType.MECacheUnfiltered;
+    }
+
+    public boolean storePartial(ItemStack stack) {
+        return storePartial(stack, false);
+    }
+
     /** @return the fluid provider, used by the transaction classes. */
     MTEHatchOutputMEBase<IAEFluidStack> getFluidProvider() {
         return fluidProvider;
