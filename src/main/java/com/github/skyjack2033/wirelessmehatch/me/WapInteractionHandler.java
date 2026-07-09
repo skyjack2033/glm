@@ -16,8 +16,8 @@ import com.github.skyjack2033.wirelessmehatch.api.IWirelessMEHatch;
 import appeng.api.AEApi;
 import appeng.api.implementations.items.IMemoryCard;
 import appeng.api.implementations.items.MemoryCardMessages;
-import appeng.api.networking.GridFlags;
 import appeng.api.networking.IGrid;
+import appeng.api.networking.IGridConnection;
 import appeng.api.networking.IGridHost;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.pathing.ControllerState;
@@ -25,28 +25,33 @@ import appeng.api.networking.pathing.IPathingGrid;
 import appeng.me.helpers.IGridProxyable;
 import appeng.tile.networking.TileController;
 import cpw.mods.fml.common.eventhandler.Event;
+import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 
 /**
  * Handles the wireless ME binding flow via AE2 Memory Card:
  *
- * 1. Sneak-right-click an AE2 ME Controller with a Memory Card -> record controller coordinates + player identity +
- * remaining channels.
+ * 1. Sneak-right-click an AE2 ME Controller with a Memory Card -> record controller coordinates + player identity.
  * 2. Right-click a wireless hatch with the bound card -> establish a grid connection to the controller.
  * 3. After binding, the card data is cleared (one-time use per binding).
- * 4. Screwdriver-right-click a wireless hatch -> unbind, and clear the card data.
+ * 4. Screwdriver-right-click a wireless hatch -> unbind, and clear the card data if held.
  */
 public class WapInteractionHandler {
 
     private static final String CONFIG_KEY = "itemGroup.wirelessmehatch.wap_binding";
     private static final String DATA_KEY_CTRL_DIM = "ctrlDim";
-    private final String DATA_KEY_CTRL_X = "ctrlX";
-    private final String DATA_KEY_CTRL_Y = "ctrlY";
-    private final String DATA_KEY_CTRL_Z = "ctrlZ";
-    private final String DATA_KEY_PLAYER_NAME = "playerName";
-    private final String DATA_KEY_PLAYER_UUID = "playerUUID";
+    private static final String DATA_KEY_CTRL_X = "ctrlX";
+    private static final String DATA_KEY_CTRL_Y = "ctrlY";
+    private static final String DATA_KEY_CTRL_Z = "ctrlZ";
+    private static final String DATA_KEY_PLAYER_NAME = "playerName";
+    private static final String DATA_KEY_PLAYER_UUID = "playerUUID";
 
-    @SubscribeEvent
+    /**
+     * High-priority handler: intercepts sneak-right-click on ME Controller with a Memory Card BEFORE AE2's own
+     * ToolMemoryCard.onItemUse can process (and clear) the card. By setting both useBlock and useItem to DENY at
+     * HIGHEST priority, we prevent AE2 from seeing the interaction at all.
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onPlayerInteract(PlayerInteractEvent event) {
         if (event.action != PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK) return;
         if (!event.entityPlayer.isSneaking()) return;
@@ -57,26 +62,20 @@ public class WapInteractionHandler {
         TileEntity te = event.world.getTileEntity(event.x, event.y, event.z);
         if (!(te instanceof TileController)) return;
 
+        // Fully cancel the interaction BEFORE AE2's ToolMemoryCard can process it.
+        // This prevents AE2 from clearing the card data (its sneak-right-click-on-block behavior).
+        event.setCanceled(true);
+        event.useBlock = Event.Result.DENY;
+        event.useItem = Event.Result.DENY;
+
+        // Only process on server side - client just sees the cancellation.
+        if (event.world.isRemote) return;
+
         IGridHost gridHost = (IGridHost) te;
         IGridNode ctrlNode = gridHost.getGridNode(ForgeDirection.UNKNOWN);
         if (ctrlNode == null) return;
 
-        // Get channel info from the controller's grid.
-        int[] channelInfo = getChannelInfo(ctrlNode);
-        int usedChannels = channelInfo[0];
-        int maxChannels = channelInfo[1];
-        int remaining = maxChannels - usedChannels;
-
-        // If no channels remain, notify and abort.
-        if (remaining <= 0) {
-            event.entityPlayer.addChatMessage(
-                new ChatComponentText("\u00A7c[Wireless ME Hatch] This ME Controller has no available channels!"));
-            event.useBlock = Event.Result.DENY;
-            event.useItem = Event.Result.DENY;
-            return;
-        }
-
-        // Record the controller coordinates, player identity, and channel info onto the memory card.
+        // Record controller coordinates and player identity onto the memory card.
         IMemoryCard card = (IMemoryCard) held.getItem();
         NBTTagCompound data = new NBTTagCompound();
         data.setInteger(DATA_KEY_CTRL_DIM, te.getWorldObj().provider.dimensionId);
@@ -91,19 +90,10 @@ public class WapInteractionHandler {
         card.setMemoryCardContents(held, CONFIG_KEY, data);
         card.notifyUser(event.entityPlayer, MemoryCardMessages.SETTINGS_SAVED);
 
-        // Show remaining channels to the player.
-        event.entityPlayer.addChatMessage(
-            new ChatComponentText(
-                "\u00A7a[Wireless ME Hatch] ME Controller bound. Channels: " + usedChannels
-                    + "/"
-                    + maxChannels
-                    + " (remaining: "
-                    + remaining
-                    + ")"));
-
-        // Prevent the controller from processing the sneak-right-click.
-        event.useBlock = Event.Result.DENY;
-        event.useItem = Event.Result.DENY;
+        // Show channel info to the player (using the efficient AE2/Waila method).
+        String channelInfo = getChannelInfoString(ctrlNode);
+        event.entityPlayer
+            .addChatMessage(new ChatComponentText("\u00A7a[Wireless ME Hatch] ME Controller bound." + channelInfo));
     }
 
     /**
@@ -115,15 +105,15 @@ public class WapInteractionHandler {
     public static boolean bindHatchFromCard(IWirelessMEHatch hatch, ItemStack cardStack, EntityPlayer player) {
         if (!(cardStack.getItem() instanceof IMemoryCard card)) return false;
         NBTTagCompound data = card.getData(cardStack);
-        if (data == null || !data.hasKey("ctrlX")) {
+        if (data == null || !data.hasKey(DATA_KEY_CTRL_X)) {
             card.notifyUser(player, MemoryCardMessages.INVALID_MACHINE);
             return false;
         }
 
-        int dim = data.getInteger("ctrlDim");
-        int x = data.getInteger("ctrlX");
-        int y = data.getInteger("ctrlY");
-        int z = data.getInteger("ctrlZ");
+        int dim = data.getInteger(DATA_KEY_CTRL_DIM);
+        int x = data.getInteger(DATA_KEY_CTRL_X);
+        int y = data.getInteger(DATA_KEY_CTRL_Y);
+        int z = data.getInteger(DATA_KEY_CTRL_Z);
 
         World world = DimensionManager.getWorld(dim);
         if (world == null) {
@@ -165,10 +155,11 @@ public class WapInteractionHandler {
         }
 
         // Apply player identity for AE2 security.
-        if (data.hasKey("playerUUID")) {
+        if (data.hasKey(DATA_KEY_PLAYER_UUID)) {
             try {
-                java.util.UUID uuid = java.util.UUID.fromString(data.getString("playerUUID"));
-                String name = data.hasKey("playerName") ? data.getString("playerName") : uuid.toString();
+                java.util.UUID uuid = java.util.UUID.fromString(data.getString(DATA_KEY_PLAYER_UUID));
+                String name = data.hasKey(DATA_KEY_PLAYER_NAME) ? data.getString(DATA_KEY_PLAYER_NAME)
+                    : uuid.toString();
                 int playerId = appeng.core.worlddata.WorldData.instance()
                     .playerData()
                     .getPlayerID(new com.mojang.authlib.GameProfile(uuid, name));
@@ -184,7 +175,7 @@ public class WapInteractionHandler {
         card.notifyUser(player, MemoryCardMessages.SETTINGS_LOADED);
 
         // Clear the card data (one-time use per binding).
-        card.setMemoryCardContents(cardStack, "itemGroup.wirelessmehatch.wap_binding", new NBTTagCompound());
+        card.setMemoryCardContents(cardStack, CONFIG_KEY, new NBTTagCompound());
 
         return true;
     }
@@ -197,40 +188,38 @@ public class WapInteractionHandler {
         // If the player holds a memory card, clear its data too.
         ItemStack held = player.getHeldItem();
         if (held != null && held.getItem() instanceof IMemoryCard card) {
-            card.setMemoryCardContents(held, "itemGroup.wirelessmehatch.wap_binding", new NBTTagCompound());
+            card.setMemoryCardContents(held, CONFIG_KEY, new NBTTagCompound());
             card.notifyUser(player, MemoryCardMessages.SETTINGS_CLEARED);
         }
     }
 
     /**
-     * Get channel usage info from a controller's grid node. Returns {usedChannels, maxChannels}. When the controller
-     * is online but pathing hasn't calculated max channels yet (e.g. controller is standalone), defaults to 8 (standard
-     * controller capacity). Never returns {0, 0} for a valid online controller.
+     * Get channel info string using the AE2/Waila official method: only inspect the controller node's direct
+     * connections (O(connections), typically 1-6), NOT the entire grid. This is the same pattern used by
+     * {@code IUsedChannelProvider} and {@code TileWirelessBase.getUsedChannels()}.
+     *
+     * Returns a string like " Channels: 3/8 (remaining: 5)" or " Channels: disabled".
      */
-    private int[] getChannelInfo(IGridNode ctrlNode) {
-        int[] result = new int[] { 0, 8 }; // default: 0 used, 8 max (standard controller)
+    private static String getChannelInfoString(IGridNode ctrlNode) {
         try {
             IGrid grid = ctrlNode.getGrid();
-            if (grid == null) return result;
+            if (grid == null) return "";
 
             IPathingGrid pathing = grid.getCache(IPathingGrid.class);
-            if (pathing == null) return result;
+            if (pathing == null) return "";
 
-            // If controller state is NO_CONTROLLER, the grid has no controller - abort.
             if (pathing.getControllerState() == ControllerState.NO_CONTROLLER) {
-                return new int[] { 0, 0 };
+                return " (no controller on network)";
             }
 
-            // Count nodes that require a channel.
+            // Used channels: max of all direct connection's getUsedChannels() -- same as Waila/IUsedChannelProvider.
             int used = 0;
-            for (IGridNode node : grid.getNodes()) {
-                if (node.hasFlag(GridFlags.REQUIRE_CHANNEL)) {
-                    used++;
-                }
+            for (IGridConnection conn : ctrlNode.getConnections()) {
+                used = Math.max(used, conn.getUsedChannels());
             }
 
-            // Max channels from the controller node's pathing info.
-            int max = 8; // default for a standard controller
+            // Max channels: from the node itself (8 for standard, 32 for dense, MAX for creative).
+            int max = 8;
             if (ctrlNode instanceof appeng.me.GridNode gn) {
                 int calculated = gn.getMaxChannels();
                 if (calculated > 0) {
@@ -238,10 +227,11 @@ public class WapInteractionHandler {
                 }
             }
 
-            result[0] = used;
-            result[1] = max;
-        } catch (Exception ignored) {}
-        return result;
+            int remaining = max - used;
+            return " Channels: " + used + "/" + max + " (remaining: " + remaining + ")";
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 
     /**
