@@ -22,8 +22,8 @@ import com.cleanroommc.modularui.utils.item.IItemHandlerModifiable;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.github.skyjack2033.wirelessmehatch.api.IWirelessMEHatch;
 import com.github.skyjack2033.wirelessmehatch.gui.MTEWirelessInputHatchMEGui;
-import com.github.skyjack2033.wirelessmehatch.me.MemoryCardHandler;
 import com.github.skyjack2033.wirelessmehatch.me.PlayerIdResolver;
+import com.github.skyjack2033.wirelessmehatch.me.WapInteractionHandler;
 import com.github.skyjack2033.wirelessmehatch.me.WirelessGridManager;
 
 import appeng.api.config.Actionable;
@@ -118,7 +118,7 @@ public class MTEWirelessInputHatchME extends MTEHatchInput
                 "Merges fluid input hatch and item input bus into one block",
                 "Pulls items and fluids from your ME network wirelessly - no cables needed",
                 "16 item and 16 fluid config slots for filtering", "How to connect:",
-                "  1. Sneak-right-click an AE2 Wireless Access Point with a Memory Card",
+                "  1. Sneak-right-click an AE2 ME Controller with a Memory Card",
                 "  2. Right-click this hatch with the bound Memory Card", "  3. Screwdriver right-click to unbind",
                 "Compatible with all GregTech multiblock machines" });
         initSlots();
@@ -262,7 +262,7 @@ public class MTEWirelessInputHatchME extends MTEHatchInput
         // Memory Card binding only on server side - on client, always fall through to super so GUI opens.
         if (aBaseMetaTileEntity.isServerSide()) {
             ItemStack held = aPlayer.getHeldItem();
-            if (held != null && MemoryCardHandler.bindHatchFromCard(this, held, aPlayer)) {
+            if (held != null && WapInteractionHandler.bindHatchFromCard(this, held, aPlayer)) {
                 return true;
             }
         }
@@ -272,7 +272,7 @@ public class MTEWirelessInputHatchME extends MTEHatchInput
     @Override
     public void onScrewdriverRightClick(ForgeDirection side, EntityPlayer aPlayer, float aX, float aY, float aZ,
         ItemStack aTool) {
-        MemoryCardHandler.unbindHatch(this, aPlayer);
+        WapInteractionHandler.unbindHatch(this, aPlayer);
     }
 
     // ---- IDualInputHatch ----

@@ -14,8 +14,8 @@ import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.github.skyjack2033.wirelessmehatch.api.IDualOutputHatch;
 import com.github.skyjack2033.wirelessmehatch.api.IWirelessMEHatch;
 import com.github.skyjack2033.wirelessmehatch.gui.MTEWirelessOutputHatchMEGui;
-import com.github.skyjack2033.wirelessmehatch.me.MemoryCardHandler;
 import com.github.skyjack2033.wirelessmehatch.me.PlayerIdResolver;
+import com.github.skyjack2033.wirelessmehatch.me.WapInteractionHandler;
 import com.github.skyjack2033.wirelessmehatch.me.WirelessGridManager;
 
 import appeng.api.AEApi;
@@ -89,7 +89,7 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
                 "Connects to your ME network wirelessly - no cables needed",
                 "Stores items and fluids directly into the bound ME network",
                 "Capacity: Unlimited (insert a storage cell for partitioning)", "How to connect:",
-                "  1. Sneak-right-click an AE2 Wireless Access Point with a Memory Card",
+                "  1. Sneak-right-click an AE2 ME Controller with a Memory Card",
                 "  2. Right-click this hatch with the bound Memory Card", "  3. Screwdriver right-click to unbind",
                 "Compatible with all GregTech multiblock machines" },
             1);
@@ -147,7 +147,7 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
         // Memory Card binding only on server side - on client, always fall through to super so GUI opens.
         if (aBaseMetaTileEntity.isServerSide()) {
             ItemStack held = aPlayer.getHeldItem();
-            if (held != null && MemoryCardHandler.bindHatchFromCard(this, held, aPlayer)) {
+            if (held != null && WapInteractionHandler.bindHatchFromCard(this, held, aPlayer)) {
                 return true;
             }
         }
@@ -165,7 +165,7 @@ public class MTEWirelessOutputHatchME extends MTEHatchOutput
         if (aPlayer.isSneaking()) {
             fluidProvider.onScrewdriverRightClick(side, aPlayer, aX, aY, aZ, aTool);
         } else {
-            MemoryCardHandler.unbindHatch(this, aPlayer);
+            WapInteractionHandler.unbindHatch(this, aPlayer);
         }
     }
 
