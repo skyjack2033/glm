@@ -9,10 +9,9 @@ import gregtech.api.util.GTUtility;
 
 /**
  * Adapter that wraps a {@link MTEWirelessOutputHatchME} as an {@link IOutputBus} for GT's item output pipeline
- * ({@code ItemEjectionHelper}, {@code VoidProtectionHelper}, {@code ParallelHelper}). This is needed because the hatch
- * also extends {@code MTEHatchOutput} (which implements {@code IOutputHatch}), and {@code IOutputHatch} and
- * {@code IOutputBus} both declare {@code createTransaction()} with incompatible return types, so the hatch cannot
- * implement both interfaces directly.
+ * (ItemEjectionHelper, VoidProtectionHelper, ParallelHelper). Needed because the hatch extends MTEHatchOutput (which
+ * implements IOutputHatch), and IOutputHatch.createTransaction() conflicts with IOutputBus.createTransaction() on
+ * return type. Registered into parent multi-block's mOutputBusses via reflection (no Mixin).
  */
 public class WirelessOutputBusAdapter implements IOutputBus {
 
@@ -30,7 +29,7 @@ public class WirelessOutputBusAdapter implements IOutputBus {
 
     @Override
     public boolean isFilteredToItem(GTUtility.ItemId itemId) {
-        return hatch.isFilteredToItem(itemId);
+        return false;
     }
 
     @Override
@@ -55,5 +54,15 @@ public class WirelessOutputBusAdapter implements IOutputBus {
 
     public MTEWirelessOutputHatchME getHatch() {
         return hatch;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof WirelessOutputBusAdapter other && other.hatch == hatch;
+    }
+
+    @Override
+    public int hashCode() {
+        return System.identityHashCode(hatch);
     }
 }
