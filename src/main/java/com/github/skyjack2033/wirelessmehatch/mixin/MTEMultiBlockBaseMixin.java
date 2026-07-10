@@ -15,7 +15,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.github.skyjack2033.wirelessmehatch.api.IDualOutputHatch;
 
-import gregtech.api.interfaces.IOutputBus;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 
 @Mixin(value = gregtech.api.metatileentity.implementations.MTEMultiBlockBase.class, remap = false)
@@ -107,29 +106,6 @@ public class MTEMultiBlockBaseMixin implements MTEMultiBlockBaseMixinAccessor {
             if (remainder.amount <= 0) break;
             int accepted = dual.fill(remainder, true);
             if (accepted > 0) remainder.amount -= accepted;
-        }
-    }
-
-    @Inject(method = "getOutputBusses", at = @At("RETURN"))
-    private void wirelessmehatch$onGetOutputBusses(CallbackInfoReturnable<List<IOutputBus>> cir) {
-        if (wirelessmehatch$mDualOutputHatches.isEmpty()) return;
-        List<IOutputBus> busses = cir.getReturnValue();
-        for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
-            if (dual instanceof com.github.skyjack2033.wirelessmehatch.metatileentity.MTEWirelessOutputHatchME hatch) {
-                busses.add(new com.github.skyjack2033.wirelessmehatch.metatileentity.WirelessOutputBusAdapter(hatch));
-            }
-        }
-    }
-
-    @Inject(method = "getOutputHatches", at = @At("RETURN"))
-    private void wirelessmehatch$onGetOutputHatches(
-        CallbackInfoReturnable<java.util.List<gregtech.api.interfaces.IOutputHatch>> cir) {
-        if (wirelessmehatch$mDualOutputHatches.isEmpty()) return;
-        java.util.List<gregtech.api.interfaces.IOutputHatch> hatches = cir.getReturnValue();
-        for (IDualOutputHatch dual : wirelessmehatch$mDualOutputHatches) {
-            if (dual instanceof gregtech.api.interfaces.IOutputHatch hatch && !hatches.contains(hatch)) {
-                hatches.add(hatch);
-            }
         }
     }
 }
