@@ -1,11 +1,15 @@
 {
-  "required": false,
+  "required": true,
   "minVersion": "0.8.5-GTNH",
   "package": "com.github.skyjack2033.wirelessmehatch.mixin",
   "refmap": "mixins.wirelessmehatch.refmap.json",
+  "plugin": "com.github.skyjack2033.wirelessmehatch.mixin.WirelessMEHatchMixinPlugin",
   "target": "@env(DEFAULT)",
   "compatibilityLevel": "JAVA_8",
-  "mixins": [],
+  "mixins": [
+    "MTEMultiBlockBaseMixin",
+    "MTESteamMultiBlockBaseMixin"
+  ],
   "client": [],
   "server": []
 }
