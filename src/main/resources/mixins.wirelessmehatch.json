@@ -1,13 +1,11 @@
 {
-  "required": true,
+  "required": false,
   "minVersion": "0.8.5-GTNH",
   "package": "com.github.skyjack2033.wirelessmehatch.mixin",
   "refmap": "mixins.wirelessmehatch.refmap.json",
   "target": "@env(DEFAULT)",
   "compatibilityLevel": "JAVA_8",
-  "mixins": [
-    "ToolMemoryCardMixin"
-  ],
+  "mixins": [],
   "client": [],
   "server": []
 }

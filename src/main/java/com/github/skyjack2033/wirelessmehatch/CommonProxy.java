@@ -1,5 +1,6 @@
 package com.github.skyjack2033.wirelessmehatch;
 
+import com.github.skyjack2033.wirelessmehatch.loader.ItemLoader;
 import com.github.skyjack2033.wirelessmehatch.loader.MetaTileEntityLoader;
 import com.github.skyjack2033.wirelessmehatch.loader.RecipeLoader;
 
@@ -16,6 +17,7 @@ public class CommonProxy {
     }
 
     public void init(FMLInitializationEvent event) {
+        ItemLoader.register();
         MetaTileEntityLoader.register();
     }
 

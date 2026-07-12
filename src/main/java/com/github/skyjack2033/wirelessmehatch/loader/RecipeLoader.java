@@ -17,57 +17,51 @@ public final class RecipeLoader {
     private RecipeLoader() {}
 
     public static void register() {
-        // Wireless Output Hatch (ME) = ME Output Hatch + ME Output Bus + AE2 Quantum Entangled Singularity + tier
-        // circuit
+        registerLinkToolRecipe();
+        registerUnifiedOutputAssemblyRecipe();
+    }
+
+    private static void registerLinkToolRecipe() {
+        ItemStack linkTool = new ItemStack(ItemLoader.WIRELESS_LINK_TOOL, 1);
+        ItemStack circuit = ItemList.Circuit_Advanced.get(1);
+        ItemStack dataCircuit = ItemList.Circuit_Data.get(1);
+        if (circuit == null || dataCircuit == null) {
+            WirelessMEHatch.LOG.warn("Skipping Wireless Link Tool recipe: missing circuit ingredient.");
+            return;
+        }
+        GTModHandler.addCraftingRecipe(
+            linkTool,
+            GTModHandler.RecipeBits.NOT_REMOVABLE,
+            new Object[] { " E ", "CDC", " R ", 'E', Items.ender_eye, 'C', circuit, 'D', dataCircuit, 'R',
+                Items.redstone });
+    }
+
+    private static void registerUnifiedOutputAssemblyRecipe() {
         ItemStack meOutputHatch = ItemList.Hatch_Output_ME.get(1);
         ItemStack meOutputBus = ItemList.Hatch_Output_Bus_ME.get(1);
         ItemStack quantumSingularity = getAe2QuantumEntangledSingularity();
         ItemStack wirelessOutput = GTModHandler
-            .getModItem("gregtech", "gt.blockmachines", 1, Config.wirelessOutputHatchMeId);
+            .getModItem("gregtech", "gt.blockmachines", 1, Config.wirelessUnifiedOutputAssemblyMeId);
+        ItemStack linkTool = new ItemStack(ItemLoader.WIRELESS_LINK_TOOL, 1);
 
         if (meOutputHatch == null || meOutputBus == null || quantumSingularity == null || wirelessOutput == null) {
             WirelessMEHatch.LOG.warn(
-                "Skipping Wireless Output Hatch ME recipe registration: a required ingredient is null "
+                "Skipping Wireless Unified Output Assembly recipe: missing ingredient "
                     + "(meOutputHatch={}, meOutputBus={}, quantumSingularity={}, wirelessOutput={}).",
                 meOutputHatch,
                 meOutputBus,
                 quantumSingularity,
                 wirelessOutput);
-        } else {
-            GTModHandler.addCraftingRecipe(
-                wirelessOutput,
-                GTModHandler.RecipeBits.NOT_REMOVABLE,
-                new Object[] { "ABA", "CDC", "AEA", 'A', meOutputHatch, 'B', meOutputBus, 'C', quantumSingularity, 'D',
-                    ItemList.Circuit_Advanced.get(1), 'E', Items.ender_eye });
+            return;
         }
 
-        // Wireless Input Hatch (ME) = ME Input Hatch + ME Input Bus + Quantum Singularity + tier circuit
-        ItemStack meInputHatch = ItemList.Hatch_Input_ME.get(1);
-        ItemStack meInputBus = ItemList.Hatch_Input_Bus_ME.get(1);
-        ItemStack wirelessInput = GTModHandler
-            .getModItem("gregtech", "gt.blockmachines", 1, Config.wirelessInputHatchMeId);
-
-        if (meInputHatch == null || meInputBus == null || quantumSingularity == null || wirelessInput == null) {
-            WirelessMEHatch.LOG.warn(
-                "Skipping Wireless Input Hatch ME recipe registration: a required ingredient is null "
-                    + "(meInputHatch={}, meInputBus={}, quantumSingularity={}, wirelessInput={}).",
-                meInputHatch,
-                meInputBus,
-                quantumSingularity,
-                wirelessInput);
-        } else {
-            GTModHandler.addCraftingRecipe(
-                wirelessInput,
-                GTModHandler.RecipeBits.NOT_REMOVABLE,
-                new Object[] { "ABA", "CDC", "AEA", 'A', meInputHatch, 'B', meInputBus, 'C', quantumSingularity, 'D',
-                    ItemList.Circuit_Advanced.get(1), 'E', Items.ender_eye });
-        }
+        GTModHandler.addCraftingRecipe(
+            wirelessOutput,
+            GTModHandler.RecipeBits.NOT_REMOVABLE,
+            new Object[] { "ABA", "CDC", "AEA", 'A', quantumSingularity, 'B', meOutputBus, 'C', meOutputHatch, 'D',
+                ItemList.Circuit_Advanced.get(1), 'E', linkTool });
     }
 
-    /**
-     * Get the AE2 Quantum Entangled Singularity via AE2's official definitions API, avoiding fragile hardcoded
-     * item-name/meta lookups. Falls back to null if AE2 is not loaded or the item is unavailable.
-     */
     private static ItemStack getAe2QuantumEntangledSingularity() {
         try {
             IItemDefinition qeSingularity = AEApi.instance()
