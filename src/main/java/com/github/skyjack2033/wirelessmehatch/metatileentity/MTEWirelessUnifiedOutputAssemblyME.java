@@ -364,11 +364,18 @@ public class MTEWirelessUnifiedOutputAssemblyME extends MTEHatchOutput implement
         linkManager.onReady();
     }
 
+    static boolean shouldShowConnectedTexture(boolean wirelessConnected, boolean proxyActive) {
+        return wirelessConnected && proxyActive;
+    }
+
     @Override
     public void onPostTick(IGregTechTileEntity baseTile, long tick) {
         super.onPostTick(baseTile, tick);
         if (baseTile.isServerSide()) {
             linkManager.tickCheck();
+            if (tick % 20L == 0L) {
+                baseTile.setActive(shouldShowConnectedTexture(isWirelessConnected(), getProxy().isActive()));
+            }
             outputCore.flush();
         }
     }

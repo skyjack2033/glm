@@ -45,6 +45,17 @@ public class MTEWirelessUnifiedOutputAssemblyMETest {
     }
 
     @Test
+    public void connectedTextureRequiresLiveLinkAndActiveProxy() {
+        MTEWirelessUnifiedOutputAssemblyME assembly = assembly();
+        Class<?>[] parameterTypes = { boolean.class, boolean.class };
+
+        assertFalse(invokeBoolean(assembly, "shouldShowConnectedTexture", parameterTypes, false, false));
+        assertFalse(invokeBoolean(assembly, "shouldShowConnectedTexture", parameterTypes, false, true));
+        assertFalse(invokeBoolean(assembly, "shouldShowConnectedTexture", parameterTypes, true, false));
+        assertTrue(invokeBoolean(assembly, "shouldShowConnectedTexture", parameterTypes, true, true));
+    }
+
+    @Test
     public void sharedRemainingCapacityUsesLongAggregateOccupancy() throws ReflectiveOperationException {
         MTEWirelessUnifiedOutputAssemblyME assembly = assembly();
         WirelessOutputCapacityHost capacityHost = (WirelessOutputCapacityHost) (Object) assembly;
