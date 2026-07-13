@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [ master, main ]
   push:
-    branches: [ master, main ]
+    branches: [ master, main, feature-mehatch ]
 
 jobs:
   build-and-test:
