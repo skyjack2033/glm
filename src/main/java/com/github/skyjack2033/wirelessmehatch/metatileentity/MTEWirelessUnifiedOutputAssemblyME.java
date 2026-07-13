@@ -34,6 +34,7 @@ import appeng.me.helpers.IGridProxyable;
 import gregtech.api.enums.GTValues;
 import gregtech.api.enums.OutputBusType;
 import gregtech.api.enums.Textures;
+import gregtech.api.interfaces.IIconContainer;
 import gregtech.api.interfaces.IOutputBus;
 import gregtech.api.interfaces.IOutputBusTransaction;
 import gregtech.api.interfaces.ITexture;
@@ -46,6 +47,11 @@ import gregtech.api.util.GTUtility;
 public class MTEWirelessUnifiedOutputAssemblyME extends MTEHatchOutput implements IOutputBus, WirelessDualRoleOutput,
     SharedFluidOutputStore, WirelessBindable, WirelessOutputCapacityHost, IGridProxyable, IActionHost,
     IPowerChannelState, WirelessUnifiedOutputCore.NetworkAccess, WirelessLinkManager.ProxyContext {
+
+    private static final IIconContainer OVERLAY_DISCONNECTED = Textures.BlockIcons
+        .custom("wirelessmehatch:iconsets/OVERLAY_WIRELESS_UNIFIED_OUTPUT_ASSEMBLY");
+    private static final IIconContainer OVERLAY_CONNECTED = Textures.BlockIcons
+        .custom("wirelessmehatch:iconsets/OVERLAY_WIRELESS_UNIFIED_OUTPUT_ASSEMBLY_ACTIVE");
 
     private final WirelessUnifiedOutputCore outputCore;
     private final FluidStackTank aggregateFluidTank;
@@ -89,12 +95,12 @@ public class MTEWirelessUnifiedOutputAssemblyME extends MTEHatchOutput implement
 
     @Override
     public ITexture[] getTexturesActive(ITexture baseTexture) {
-        return new ITexture[] { baseTexture, TextureFactory.of(Textures.BlockIcons.OVERLAY_ME_HATCH) };
+        return new ITexture[] { baseTexture, TextureFactory.of(OVERLAY_CONNECTED) };
     }
 
     @Override
     public ITexture[] getTexturesInactive(ITexture baseTexture) {
-        return new ITexture[] { baseTexture, TextureFactory.of(Textures.BlockIcons.OVERLAY_ME_HATCH) };
+        return new ITexture[] { baseTexture, TextureFactory.of(OVERLAY_DISCONNECTED) };
     }
 
     @Override
