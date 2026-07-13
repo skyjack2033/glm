@@ -1,0 +1,100 @@
+name: Tagged release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        with:
+          validate-wrappers: true
+
+      - name: Build
+        run: ./gradlew clean spotlessJavaCheck test build --rerun-tasks --console=plain
+
+      - name: Select production JAR
+        id: artifact
+        shell: bash
+        run: |
+          mapfile -d '' -t jars < <(
+            find build/libs -maxdepth 1 -type f -name '*.jar' \
+              ! -name '*-dev.jar' \
+              ! -name '*-sources.jar' \
+              ! -name '*-api.jar' \
+              -print0
+          )
+
+          if (( ${#jars[@]} != 1 )); then
+            printf 'Expected exactly one production JAR, found %d:\n' "${#jars[@]}"
+            for jar in "${jars[@]}"; do
+              printf '  %s\n' "$jar"
+            done
+            exit 1
+          fi
+
+          printf 'jar=%s\n' "${jars[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish tagged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_PATH: ${{ steps.artifact.outputs.jar }}
+        shell: bash
+        run: |
+          case "$ARTIFACT_PATH" in
+            build/libs/*.jar) ;;
+            *)
+              printf 'Invalid production JAR path: %s\n' "$ARTIFACT_PATH" >&2
+              exit 1
+              ;;
+          esac
+
+          release_error="$(mktemp)"
+          trap 'rm -f "$release_error"' EXIT
+          if release_state="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" --jq '[.draft, .prerelease] | @tsv' 2>"$release_error")"; then
+            IFS=$'\t' read -r release_draft release_prerelease <<< "$release_state"
+            if [[ "$release_draft" == true && "$release_prerelease" == false ]]; then
+              gh release delete "$GITHUB_REF_NAME" --yes
+            else
+              printf 'A published or prerelease release already exists for tag %s; refusing to replace it.\n' "$GITHUB_REF_NAME" >&2
+              exit 1
+            fi
+          else
+            api_status=$?
+            if ! grep -Fq '(HTTP 404)' "$release_error"; then
+              cat "$release_error" >&2
+              exit "$api_status"
+            fi
+          fi
+
+          gh release create "$GITHUB_REF_NAME" \
+            "$ARTIFACT_PATH" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --draft
+
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest

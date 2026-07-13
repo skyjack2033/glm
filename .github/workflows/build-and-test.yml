@@ -1,13 +1,19 @@
-
 name: Build and test
 
 on:
-  pull_request:
-    branches: [ master, main ]
   push:
-    branches: [ master, main, feature-mehatch ]
+    branches: ['**']
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
-    uses: GTNewHorizons/GTNH-Actions-Workflows/.github/workflows/build-and-test.yml@master
-    secrets: inherit
+    uses: GTNewHorizons/GTNH-Actions-Workflows/.github/workflows/build-and-test.yml@219d11877bb9008ac107d7d11e01bccef5ecbb8c

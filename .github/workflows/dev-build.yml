@@ -1,0 +1,196 @@
+name: Development build
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dev-build
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        with:
+          validate-wrappers: true
+
+      - name: Build
+        run: ./gradlew clean spotlessJavaCheck test build --rerun-tasks --console=plain
+
+      - name: Select production JAR
+        id: artifact
+        shell: bash
+        run: |
+          mapfile -d '' -t jars < <(
+            find build/libs -maxdepth 1 -type f -name '*.jar' \
+              ! -name '*-dev.jar' \
+              ! -name '*-sources.jar' \
+              ! -name '*-api.jar' \
+              -print0
+          )
+
+          if (( ${#jars[@]} != 1 )); then
+            printf 'Expected exactly one production JAR, found %d:\n' "${#jars[@]}"
+            for jar in "${jars[@]}"; do
+              printf '  %s\n' "$jar"
+            done
+            exit 1
+          fi
+
+          printf 'jar=%s\n' "${jars[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish development release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_PATH: ${{ steps.artifact.outputs.jar }}
+        shell: bash
+        run: |
+          case "$ARTIFACT_PATH" in
+            build/libs/*.jar) ;;
+            *)
+              printf 'Invalid production JAR path: %s\n' "$ARTIFACT_PATH" >&2
+              exit 1
+              ;;
+          esac
+          artifact_name="$(basename -- "$ARTIFACT_PATH")"
+
+          release_error="$(mktemp)"
+          staged_asset_path=""
+          cleanup() {
+            rm -f "$release_error"
+            if [[ -n "$staged_asset_path" ]]; then
+              rm -f "$staged_asset_path"
+            fi
+          }
+          trap cleanup EXIT
+
+          if release_state="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/dev-build" --jq '[.id, .draft] | @tsv' 2>"$release_error")"; then
+            IFS=$'\t' read -r release_id release_draft <<< "$release_state"
+            if [[ -z "$release_id" || ( "$release_draft" != true && "$release_draft" != false ) ]]; then
+              printf 'Invalid release state returned for dev-build.\n' >&2
+              exit 1
+            fi
+            release_exists=true
+          else
+            api_status=$?
+            if grep -Fq '(HTTP 404)' "$release_error"; then
+              release_exists=false
+            else
+              cat "$release_error" >&2
+              exit "$api_status"
+            fi
+          fi
+
+          if [[ "$release_exists" == true && "$release_draft" == true ]]; then
+            gh release delete dev-build --yes
+            release_exists=false
+          fi
+
+          if [[ "$release_exists" == false ]]; then
+            git tag --force dev-build "$GITHUB_SHA"
+            git push --force origin refs/tags/dev-build
+
+            gh release create dev-build \
+              "$ARTIFACT_PATH" \
+              --verify-tag \
+              --target "$GITHUB_SHA" \
+              --title "Development Build" \
+              --notes "Automated development build from master at ${GITHUB_SHA}. This prerelease may be unstable." \
+              --prerelease \
+              --latest=false \
+              --draft
+
+            gh release edit dev-build --draft=false --prerelease --latest=false
+          else
+            staged_asset_name="staged-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${artifact_name}"
+            staged_asset_path="${RUNNER_TEMP}/${staged_asset_name}"
+            cp -- "$ARTIFACT_PATH" "$staged_asset_path"
+            gh release upload dev-build "$staged_asset_path"
+
+            assets_tsv="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" --jq '.[] | [.id, .name] | @tsv')"
+            staged_asset_count=0
+            staged_asset_id=""
+            while IFS=$'\t' read -r asset_id asset_name; do
+              if [[ -z "$asset_id" ]]; then
+                continue
+              fi
+              if [[ "$asset_name" == "$staged_asset_name" ]]; then
+                ((staged_asset_count += 1))
+                staged_asset_id="$asset_id"
+              fi
+            done <<< "$assets_tsv"
+
+            if (( staged_asset_count != 1 )); then
+              printf 'Expected exactly one staged release asset named %s, found %d.\n' "$staged_asset_name" "$staged_asset_count" >&2
+              exit 1
+            fi
+
+            git tag --force dev-build "$GITHUB_SHA"
+            git push --force origin refs/tags/dev-build
+
+            gh release edit dev-build \
+              --draft=false \
+              --title "Development Build" \
+              --notes "Automated development build from master at ${GITHUB_SHA}. This prerelease may be unstable." \
+              --prerelease \
+              --latest=false
+
+            assets_tsv="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" --jq '.[] | [.id, .name] | @tsv')"
+            while IFS=$'\t' read -r asset_id asset_name; do
+              if [[ -z "$asset_id" ]]; then
+                continue
+              fi
+              if [[ "$asset_id" != "$staged_asset_id" ]]; then
+                gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"
+              fi
+            done <<< "$assets_tsv"
+
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/assets/${staged_asset_id}" \
+              -f "name=${artifact_name}" \
+              --silent
+          fi
+
+          final_release_state="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/dev-build" --jq '[.id, .draft] | @tsv')"
+          IFS=$'\t' read -r final_release_id final_release_draft <<< "$final_release_state"
+          if [[ -z "$final_release_id" || "$final_release_draft" != false ]]; then
+            printf 'Development release was not published successfully.\n' >&2
+            exit 1
+          fi
+
+          final_assets_tsv="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases/${final_release_id}/assets?per_page=100" --jq '.[] | [.id, .name] | @tsv')"
+          final_asset_count=0
+          final_asset_name=""
+          while IFS=$'\t' read -r final_asset_id asset_name; do
+            if [[ -z "$final_asset_id" ]]; then
+              continue
+            fi
+            ((final_asset_count += 1))
+            final_asset_name="$asset_name"
+          done <<< "$final_assets_tsv"
+
+          if (( final_asset_count != 1 )) || [[ "$final_asset_name" != "$artifact_name" ]]; then
+            printf 'Expected exactly one final release asset named %s; found %d asset(s), final name %s.\n' \
+              "$artifact_name" "$final_asset_count" "$final_asset_name" >&2
+            exit 1
+          fi
