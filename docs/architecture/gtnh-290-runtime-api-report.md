@@ -97,8 +97,18 @@ Important constraints:
 - `addOutputBusToMachineList` accepts real `MTEHatchOutputBus` instances.
 - `addOutputHatchToMachineList` accepts real `MTEHatchOutput` instances.
 - `getOutputBusses()` returns a filtered snapshot, not the backing `mOutputBusses` list.
+- `MetaTileEntity.isValid()` requires physical identity: the base tile's current MetaTileEntity must be the same object. A hidden item or fluid delegate is therefore invalid if it merely shares the physical tile reference, and assigning it as the tile's MTE invalidates the physical assembly instead.
 - Ordinary Java adapters are not safe members of GT output lists. Output-list entries must be valid GT `MetaTileEntity` objects of the expected concrete output class.
 - GT output-side classes do not provide a native public `IDualOutputHatch` equivalent to input-side `IDualInputHatch`.
+
+The unified assembly resolves those constraints with one physical object:
+
+- `MTEWirelessUnifiedOutputAssemblyME` extends `MTEHatchOutput` and directly implements `IOutputBus`, `WirelessDualRoleOutput`, and `SharedFluidOutputStore`.
+- Exact-descriptor, `require = 1`, `remap = false` `RETURN` Mixins augment both ordinary and steam `getOutputBusses()` snapshots with that same instance, using object-identity deduplication.
+- The steam `addSteamBusOutput(...)` `HEAD` hook intercepts only a complete `MTEHatchOutput` + `IOutputBus` + `WirelessDualRoleOutput` object and registers it through native `addOutputHatchToMachineList(...)`.
+- No code writes controller output lists reflectively, periodically reattaches an object, or creates a second MetaTileEntity for either role.
+
+GT's native item transaction and output dispatch remain authoritative, and the native void-protection path remains the integration point. The only fluid capacity correction is an exact-descriptor, pinned `RETURN` hook on `VoidProtectionHelper.calculateMaxFluidParallels()`: for finite shared stores it unwraps `OutputHatchWrapper`, deduplicates physical stores by identity, aggregates remaining capacity, and replaces the fluid parallel result with the combined multi-fluid limit using saturating `long` arithmetic, bounded by `maxParallel`. This can correct a conservative native early-zero return rather than merely lower it, and it does not modify cached output.
 
 ## AE2 Network API
 
@@ -182,12 +192,11 @@ Important constraints:
 
 ## Integration Rules
 
-The implementation must follow these rules for GTNH 2.9.0 beta compatibility:
+The implementation follows these rules for GTNH 2.9.0 beta compatibility:
 
-1. Do not mix into GregTech base classes such as `MTEMultiBlockBase`.
-2. Do not mix into AE2's `ToolMemoryCard` for the first custom-tool implementation.
-3. The public block must be a real `MTEHatchOutputBus` so item output is GT-native.
-4. The fluid view must be a real `MTEHatchOutput` delegate attached to the same base tile.
-5. The delegate may be reflectively inserted into `mOutputHatches`, but ordinary Java adapters must not be inserted into GT output lists.
-6. Reattachment must tolerate GT structure rechecks and `clearHatches()`.
-7. The binding target and AE2 proxy state must be persisted separately from output capacity and cache state.
+1. Use one physical `MTEHatchOutput` that directly implements the complete item and fluid contracts; never attach a hidden delegate to the same base tile.
+2. Add the physical object to item-bus snapshots only through exact pinned ordinary and steam `getOutputBusses()` return hooks, with validity checks and identity deduplication.
+3. Route steam registration through native `addOutputHatchToMachineList(...)`; do not write controller lists reflectively or reattach periodically.
+4. Keep GT's native item transaction and output dispatch authoritative. Use native fluid void protection as the integration point, with the finite shared-store aggregate hook determining the final result as described above.
+5. Do not mix into AE2's `ToolMemoryCard` for the first custom-tool implementation.
+6. Persist the binding target and AE2 proxy state separately from output capacity and cache state.

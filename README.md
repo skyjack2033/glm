@@ -11,7 +11,7 @@ A GTNH (GregTech New Horizons) mod that adds a wireless unified ME output assemb
 
 The assembly owns an AE2 `AENetworkProxy` and connects to the bound AE2 node with AE2's `createGridConnection` API, the same invisible connection mechanism used by Quantum Bridges and P2P ME tunnels.
 
-GT item output uses the native `MTEHatchOutputBus` path. Fluid output uses an internal `MTEHatchOutput` delegate attached to the same physical block, so GT sees the assembly as both output roles without using GT class Mixins.
+The physical assembly extends `MTEHatchOutput` and directly implements `IOutputBus`, so the same valid MetaTileEntity serves both fluid-hatch and item-bus roles. Exact pinned GT Mixins add that instance to ordinary and steam output-bus snapshots; steam registration still goes through GT's native output-hatch registration. GT's native item transaction and output dispatch remain authoritative. Native fluid void protection is the integration point; when a finite shared store is present, the exact aggregate return hook determines the final fluid parallel result.
 
 ### How to connect
 
@@ -52,10 +52,10 @@ A config file (`wirelessmehatch.cfg`) is generated in the `config/` directory on
 
 ## Technical Details
 
-- **Output assembly**: Extends `MTEHatchOutputBus`, so GT handles item output natively.
-- **Fluid delegate**: Internal `MTEHatchOutput` view attached to the same controller output list for fluid output.
+- **Output assembly**: One physical `MTEHatchOutput` implementing `IOutputBus`, `WirelessDualRoleOutput`, and `SharedFluidOutputStore`; there is no hidden delegate or second MetaTileEntity.
+- **GT integration**: Exact pinned Mixins augment ordinary and steam `getOutputBusses()` snapshots with identity deduplication. Steam registration calls native `addOutputHatchToMachineList`, and shared multi-fluid void protection uses an aggregate, wrapper-aware, saturating-`long` capacity limit.
 - **AE2 link**: Uses `AENetworkProxy`, `IGridNode.setPlayerID`, and `AEApi.instance().createGridConnection`.
-- **Mixin**: None. The mod no longer patches GT or AE2 classes for the first custom-tool implementation.
+- **Mixin scope**: Three narrow GT Mixins cover ordinary/steam output-bus snapshots, steam dual-role registration, and shared fluid capacity. The custom Link Tool requires no AE2 class Mixin.
 
 See `docs/architecture/` for the runtime API report and unified output assembly interface notes.
 

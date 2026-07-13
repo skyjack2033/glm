@@ -13,7 +13,7 @@ The block targets GTNH 2.9.0 beta runtime jars:
 
 - The player places one block in a GT multiblock structure.
 - GT treats the block as an output bus for item outputs.
-- GT also treats the same physical block as an output hatch for fluid outputs through an internal delegate.
+- The same physical MetaTileEntity directly provides the fluid-hatch role, while exact pinned `getOutputBusses()` snapshot Mixins expose that same instance as the item bus.
 - The player binds the block to an ME network using this mod's custom wireless link tool.
 - The block reconnects automatically after world load, chunk load, or transient network loss.
 - Screwdriver right-click clears the block's wireless target.
@@ -34,6 +34,7 @@ Capacity rules:
 - `fluidCapacity` limits the aggregate number of cached fluid millibuckets.
 - Default values may be `Long.MAX_VALUE` for initial behavior, but the fields must be persisted and exposed for future configuration.
 - Item and fluid totals must never be reduced to `int` except when creating one chunk of `ItemStack.stackSize` or `FluidStack.amount` for insertion.
+- GT's native fluid void-protection path remains the integration point. When a finite shared store is present, the exact pinned aggregate return hook determines the final fluid parallel result from the remaining shared long capacity and the combined fluid outputs, bounded by `maxParallel`; this can correct a conservative native early-zero result and does not modify cached output.
 
 ## Binding Target
 
@@ -122,36 +123,41 @@ target.ownerName: string
 
 ## GT Integration Architecture
 
-The implementation uses one physical block with two GT views:
+The implementation uses one physical block and one MetaTileEntity instance for both GT output roles:
 
 ```text
 BaseMetaTileEntity in world
     |
-    |-- real MTE: MTEWirelessUnifiedOutputAssemblyME extends MTEHatchOutputBus
-    |       - visible player-facing block
-    |       - item output bus role
-    |       - owns wireless link, AE2 proxy, NBT, GUI, output core
-    |
-    |-- delegate MTE: WirelessFluidOutputDelegate extends MTEHatchOutput
-            - no public item/block registration
-            - shares the real MTE base tile
-            - fluid output hatch role
-            - delegates all storage to the real MTE output core
+    |-- physical MTE: MTEWirelessUnifiedOutputAssemblyME extends MTEHatchOutput
+            implements IOutputBus
+            implements WirelessDualRoleOutput
+            implements SharedFluidOutputStore
+            - visible player-facing block
+            - item output bus and fluid output hatch roles
+            - owns wireless link, AE2 proxy, NBT, GUI, and output core
 ```
 
-Item side:
+`MetaTileEntity.isValid()` requires its base tile to point back to that exact MetaTileEntity instance. A hidden item or fluid delegate cannot share the physical base tile and still be valid: assigning the tile to the delegate replaces the physical assembly's identity, while not assigning it leaves the delegate invalid. The architecture therefore has no second MTE.
 
-- GT sees the real MTE as `MTEHatchOutputBus`.
+Item output:
+
+- The physical `MTEHatchOutput` implements `IOutputBus` directly.
 - `storePartial(ItemStack, boolean)` delegates to `WirelessUnifiedOutputCore.storeItem`.
 - `createTransaction()` returns an item transaction backed by the same core.
+- GT's native item transaction and output dispatch paths remain authoritative. Fluid void protection uses the native integration point and the finite shared-store replacement described below.
 
-Fluid side:
+Controller registration and snapshots:
 
-- `MultiblockOutputAttachment` finds the current `MTEMultiBlockBase` controller.
-- It inserts `WirelessFluidOutputDelegate` into `mOutputHatches`.
-- The delegate is a real `MTEHatchOutput`, not a plain adapter.
-- The delegate's `fill`, fluid store method, and transaction delegate to `WirelessUnifiedOutputCore.storeFluid`.
-- Reattachment runs periodically because GT can clear hatch lists during structure rechecks.
+- The assembly registers normally as the real `MTEHatchOutput` in `mOutputHatches`; there are no reflective controller-list writes or periodic reattachment calls.
+- Exact-descriptor, `require = 1`, `remap = false` `RETURN` Mixins augment the ordinary and steam `getOutputBusses()` snapshots with the same physical instance.
+- Snapshot augmentation accepts only a valid object implementing all of `MTEHatchOutput`, `IOutputBus`, and `WirelessDualRoleOutput`, and deduplicates by object identity.
+- The steam controller's exact `addSteamBusOutput(...)` `HEAD` hook handles only that complete dual-role object and calls the controller's native `addOutputHatchToMachineList(...)`; all other objects continue through the unmodified steam method.
+
+Fluid output and void protection:
+
+- The physical assembly's `fill` and fluid-store methods delegate to `WirelessUnifiedOutputCore.storeFluid`.
+- GT's native fluid void-protection calculation runs first. When a finite `SharedFluidOutputStore` is present, an exact-descriptor, pinned `RETURN` hook on `VoidProtectionHelper.calculateMaxFluidParallels()` replaces that result with the aggregate shared-capacity result, including correction of a conservative native early-zero return.
+- The helper unwraps `OutputHatchWrapper`, deduplicates physical stores by identity, aggregates remaining shared capacity, and uses saturating `long` addition and multiplication for the combined multi-fluid requirement.
 
 ## AE2 Link Lifecycle
 
@@ -198,16 +204,15 @@ The GUI must not cast long values through `IntSyncValue`. If MUI2 long synchroni
 ## Non-Goals For This Refactor
 
 - No input hatch work.
-- No GT base class mixins.
 - No AE2 Memory Card mixin.
 - No global automatic discovery of a player's ME networks.
-- No two-public-block fallback unless the single-physical-block delegate strategy fails in runtime testing.
+- No hidden output delegate, second MetaTileEntity, reflective controller-list mutation, or periodic reattachment path.
 
 ## Verification Checklist
 
 Runtime verification must be done in the user's GTNH 2.9.0 beta instance:
 
-1. Client starts without this mod applying GT or AE2 class mixins.
+1. Client starts with the three exact pinned GT Mixins applied and no AE2 class Mixin.
 2. Link tool records an ME Controller.
 3. Link tool records a Security Terminal.
 4. Link tool binds the assembly.

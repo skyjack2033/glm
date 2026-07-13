@@ -8,7 +8,8 @@
   "compatibilityLevel": "JAVA_8",
   "mixins": [
     "MTEMultiBlockBaseMixin",
-    "MTESteamMultiBlockBaseMixin"
+    "MTESteamMultiBlockBaseMixin",
+    "VoidProtectionHelperMixin"
   ],
   "client": [],
   "server": []

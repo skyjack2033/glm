@@ -14,15 +14,17 @@ import net.minecraft.world.World;
 import com.github.skyjack2033.wirelessmehatch.api.WirelessBindable;
 import com.github.skyjack2033.wirelessmehatch.me.WirelessLinkTarget;
 
+import appeng.api.features.INetworkEncodable;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import gregtech.api.GregTechAPI;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 
-public class ItemWirelessLinkTool extends Item {
+public class ItemWirelessLinkTool extends Item implements INetworkEncodable {
 
     private static final String KEY_TARGET = "target";
+    private static final String KEY_ENCRYPTION = "encryptionKey";
 
     public ItemWirelessLinkTool() {
         setUnlocalizedName("wirelessmehatch.link_tool");
@@ -34,7 +36,12 @@ public class ItemWirelessLinkTool extends Item {
     @Override
     public boolean onItemUseFirst(ItemStack stack, EntityPlayer player, World world, int x, int y, int z, int side,
         float hitX, float hitY, float hitZ) {
+        if (!shouldHandleUseFirst(world.isRemote)) return false;
         return useOnBlock(stack, player, world, x, y, z, false, true);
+    }
+
+    static boolean shouldHandleUseFirst(boolean isRemote) {
+        return !isRemote;
     }
 
     @Override
@@ -52,10 +59,38 @@ public class ItemWirelessLinkTool extends Item {
             }
             return true;
         }
-        if (!player.worldObj.isRemote && bindable.bindWirelessTarget(target)) {
-            player.addChatMessage(new ChatComponentText(EnumChatFormatting.GREEN + "Bound to " + target.describe()));
+        target = withBindingPlayer(target, player);
+        if (!player.worldObj.isRemote) {
+            if (bindable.bindWirelessTarget(target)) {
+                player
+                    .addChatMessage(new ChatComponentText(EnumChatFormatting.GREEN + "Bound to " + target.describe()));
+            } else {
+                player
+                    .addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "Could not bind wireless target."));
+            }
         }
         return true;
+    }
+
+    @Override
+    public String getEncryptionKey(ItemStack item) {
+        if (item == null || item.stackTagCompound == null) return "";
+        return item.stackTagCompound.getString(KEY_ENCRYPTION);
+    }
+
+    @Override
+    public void setEncryptionKey(ItemStack item, String encKey, String name) {
+        if (item == null) return;
+        if (item.stackTagCompound == null) {
+            item.stackTagCompound = new NBTTagCompound();
+        }
+        item.stackTagCompound.setString(KEY_ENCRYPTION, encKey == null ? "" : encKey);
+        WirelessLinkTarget encodedTarget = targetFromEncryptionKey(encKey);
+        if (encodedTarget != null) {
+            setTarget(item, encodedTarget);
+        } else {
+            item.stackTagCompound.removeTag(KEY_TARGET);
+        }
     }
 
     public static WirelessLinkTarget getTarget(ItemStack stack) {
@@ -114,9 +149,41 @@ public class ItemWirelessLinkTool extends Item {
         stack.stackTagCompound.setTag(KEY_TARGET, targetTag);
     }
 
+    private static WirelessLinkTarget targetFromEncryptionKey(String encKey) {
+        if (encKey == null || encKey.isEmpty()) return null;
+        try {
+            long securityKey = Long.parseLong(encKey);
+            return new WirelessLinkTarget(
+                WirelessLinkTarget.AnchorType.SECURITY_TERMINAL,
+                0,
+                0,
+                0,
+                0,
+                securityKey,
+                null,
+                "");
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static WirelessLinkTarget withBindingPlayer(WirelessLinkTarget target, EntityPlayer player) {
+        if (player == null || target.getOwnerUuid() != null) return target;
+        return new WirelessLinkTarget(
+            target.getAnchorType(),
+            target.getDimensionId(),
+            target.getX(),
+            target.getY(),
+            target.getZ(),
+            target.getLocatableSerial(),
+            player.getUniqueID(),
+            player.getCommandSenderName());
+    }
+
     private static void clearTarget(ItemStack stack) {
         if (stack.stackTagCompound != null) {
             stack.stackTagCompound.removeTag(KEY_TARGET);
+            stack.stackTagCompound.removeTag(KEY_ENCRYPTION);
         }
     }
 

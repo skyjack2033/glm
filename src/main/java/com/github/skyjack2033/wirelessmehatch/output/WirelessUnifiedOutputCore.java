@@ -64,9 +64,9 @@ public final class WirelessUnifiedOutputCore {
             GTUtility.ItemId key = GTUtility.ItemId.create(stack);
             itemCache.put(key, itemCache.getOrDefault(key, 0L) + accepted);
             itemCached += accepted;
-            stack.stackSize -= (int) accepted;
             markDirty.run();
         }
+        stack.stackSize -= (int) accepted;
         return accepted == amount;
     }
 

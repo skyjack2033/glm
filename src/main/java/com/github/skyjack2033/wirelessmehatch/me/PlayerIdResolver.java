@@ -19,7 +19,7 @@ import cpw.mods.fml.common.FMLLog;
  * AE2 nodes carry an integer player ID (see {@link IGridNode#setPlayerID(int)}) used by Security Terminals to decide
  * whether storage operations are allowed. GT's native ME hatches inherit this indirectly because their
  * {@link AENetworkProxy} owner is set during placement; the wireless hatches construct their own proxy lazily and never
- * receive a placing player, so their node's player ID defaults to 0 and the hatch is blocked behind any Security
+ * receive a placing player, so their node's player ID defaults to -1 and the hatch is blocked behind any Security
  * Terminal.
  * </p>
  *
@@ -59,9 +59,7 @@ public final class PlayerIdResolver {
             int playerId = WorldData.instance()
                 .playerData()
                 .getPlayerID(new GameProfile(ownerUuid, name));
-            if (playerId != 0) {
-                node.setPlayerID(playerId);
-            }
+            node.setPlayerID(playerId);
         } catch (Throwable t) {
             // AE2 player-data registry can be unavailable very early or in degenerate setups; never let this break the
             // tile's first tick.
@@ -74,4 +72,5 @@ public final class PlayerIdResolver {
                 .warn("Could not resolve AE2 player ID for owner {} ({}): {}", ownerName, ownerUuid, t.toString());
         }
     }
+
 }
