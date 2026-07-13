@@ -23,7 +23,12 @@ public class WirelessAssemblyTextureAssetTest {
         for (String texture : TEXTURES) {
             try (InputStream stream = getClass().getResourceAsStream(texture)) {
                 assertNotNull("Missing texture " + texture, stream);
-                BufferedImage image = ImageIO.read(stream);
+                BufferedImage image;
+                try {
+                    image = ImageIO.read(stream);
+                } catch (IOException exception) {
+                    throw new IOException("Failed to read texture " + texture, exception);
+                }
                 assertNotNull("Unreadable texture " + texture, image);
                 assertEquals("Unexpected width for " + texture, 16, image.getWidth());
                 assertEquals("Unexpected height for " + texture, 16, image.getHeight());
@@ -31,9 +36,14 @@ public class WirelessAssemblyTextureAssetTest {
                 for (int y = 0; y < image.getHeight(); y++) {
                     for (int x = 0; x < image.getWidth(); x++) {
                         int alpha = image.getRGB(x, y) >>> 24;
-                        assertTrue("Partial alpha in " + texture, alpha == 0 || alpha == 255);
+                        assertTrue(
+                            "Partial alpha in " + texture + " at (" + x + ", " + y + "): " + alpha,
+                            alpha == 0 || alpha == 255);
                         if (x < 2 || x >= 14 || y < 2 || y >= 14) {
-                            assertEquals("Opaque border pixel in " + texture, 0, alpha);
+                            assertEquals(
+                                "Opaque border pixel in " + texture + " at (" + x + ", " + y + "): " + alpha,
+                                0,
+                                alpha);
                         }
                     }
                 }
