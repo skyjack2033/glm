@@ -32,7 +32,7 @@ Capacity rules:
 
 - `itemCapacity` limits the aggregate number of cached item units.
 - `fluidCapacity` limits the aggregate number of cached fluid millibuckets.
-- Default values may be `Long.MAX_VALUE` for initial behavior, but the fields must be persisted and exposed for future configuration.
+- Default values are loaded from `config/wirelessmehatch.cfg`; both currently default to `Long.MAX_VALUE` for a newly placed assembly, while each block persists its own values in NBT.
 - Item and fluid totals must never be reduced to `int` except when creating one chunk of `ItemStack.stackSize` or `FluidStack.amount` for insertion.
 - GT's native fluid void-protection path remains the integration point. When a finite shared store is present, the exact pinned aggregate return hook determines the final fluid parallel result from the remaining shared long capacity and the combined fluid outputs, bounded by `maxParallel`; this can correct a conservative native early-zero result and does not modify cached output.
 
@@ -101,10 +101,10 @@ wirelessTarget.locatableSerial: long
 wirelessTarget.ownerUuid: string
 wirelessTarget.ownerName: string
 wirelessLink.proxy: compound
-output.itemCapacity: long
-output.fluidCapacity: long
-output.itemCache: compound
-output.fluidCache: compound
+wirelessOutput.itemCapacity: long
+wirelessOutput.fluidCapacity: long
+wirelessOutput.itemCache: compound
+wirelessOutput.fluidCache: compound
 ```
 
 Wireless link tool NBT:
@@ -134,7 +134,7 @@ BaseMetaTileEntity in world
             implements SharedFluidOutputStore
             - visible player-facing block
             - item output bus and fluid output hatch roles
-            - owns wireless link, AE2 proxy, NBT, GUI, and output core
+            - owns wireless link, AE2 proxy, NBT, scanner information, and output core
 ```
 
 `MetaTileEntity.isValid()` requires its base tile to point back to that exact MetaTileEntity instance. A hidden item or fluid delegate cannot share the physical base tile and still be valid: assigning the tile to the delegate replaces the physical assembly's identity, while not assigning it leaves the delegate invalid. The architecture therefore has no second MTE.
@@ -185,21 +185,18 @@ Tool interactions:
 
 All state-changing behavior is server-side. Client side only provides tooltip and feedback display.
 
-## GUI Requirements
+## Status Reporting
 
-The assembly GUI should show:
+`getInfoData()` exposes four categories of scanner information:
 
-- connection state
-- target type
-- target dimension and coordinates
-- owner name
-- `itemCapacity`
-- `fluidCapacity`
-- cached item count
-- cached fluid amount
-- last connection failure message
+- cached item count and `itemCapacity`
+- cached fluid amount and `fluidCapacity`
+- wireless target state as `Bound` or `Unbound`
+- ME connection state as `Connected` or `Disconnected`
 
-The GUI must not cast long values through `IntSyncValue`. If MUI2 long synchronization is awkward, capacity can be read-only in the first implementation and configured through config/defaults until a safe long editor is added.
+The block's status texture is refreshed every 20 ticks. It shows the cyan Wi-Fi overlay only when a wireless grid connection exists and the AE2 proxy is active; otherwise it shows the red X overlay. The active Wi-Fi overlay does not report whether ME storage has room for another insertion.
+
+There is currently no configuration GUI. Empty-hand right-click is consumed and does not open an editor. Default capacities come from `config/wirelessmehatch.cfg`; every placed block persists its own `long` capacities and item/fluid caches under `wirelessOutput.itemCapacity`, `wirelessOutput.fluidCapacity`, `wirelessOutput.itemCache`, and `wirelessOutput.fluidCache` in block NBT.
 
 ## Non-Goals For This Refactor
 

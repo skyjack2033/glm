@@ -6,7 +6,7 @@
 		"description": "Wireless ME output integration for GregTech. Use a Wireless Link Tool to bind the unified output assembly to an AE2 ME Controller or Security Terminal, then cache multiblock item and fluid outputs into that ME network.",
 		"version": "${modVersion}",
 		"mcversion": "${minecraftVersion}",
-		"url": "",
+		"url": "https://github.com/skyjack2033/glm",
 		"updateUrl": "",
 		"authorList": ["skyjack2033"],
 		"credits": "",
