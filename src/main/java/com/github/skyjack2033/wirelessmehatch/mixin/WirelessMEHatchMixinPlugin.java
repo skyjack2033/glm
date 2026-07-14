@@ -11,9 +11,11 @@ import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 public class WirelessMEHatchMixinPlugin implements IMixinConfigPlugin {
 
     private static final String GT_VERSION = "5.09.52.594";
+    private static final String GTNL_VERSION = "dev-290";
     private static final String MIXIN_PACKAGE = "com.github.skyjack2033.wirelessmehatch.mixin.";
     private static final String ORDINARY_MIXIN = MIXIN_PACKAGE + "MTEMultiBlockBaseMixin";
     private static final String STEAM_MIXIN = MIXIN_PACKAGE + "MTESteamMultiBlockBaseMixin";
+    private static final String GTNL_STEAM_MIXIN = MIXIN_PACKAGE + "GTNLSteamMultiMachineBaseMixin";
     private static final String VOID_PROTECTION_MIXIN = MIXIN_PACKAGE + "VoidProtectionHelperMixin";
 
     private static final String OUTPUT_BUSSES = "getOutputBusses";
@@ -51,6 +53,13 @@ public class WirelessMEHatchMixinPlugin implements IMixinConfigPlugin {
         } else if (STEAM_MIXIN.equals(mixinClassName)) {
             requireMethod(targetClassName, targetClass, OUTPUT_BUSSES, OUTPUT_BUSSES_DESCRIPTOR);
             requireMethod(targetClassName, targetClass, STEAM_OUTPUT, STEAM_OUTPUT_DESCRIPTOR);
+        } else if (GTNL_STEAM_MIXIN.equals(mixinClassName)) {
+            requireMethod(
+                "GTNL " + GTNL_VERSION,
+                targetClassName,
+                targetClass,
+                OUTPUT_BUSSES,
+                OUTPUT_BUSSES_DESCRIPTOR);
         } else if (VOID_PROTECTION_MIXIN.equals(mixinClassName)) {
             requireMethod(targetClassName, targetClass, FLUID_PARALLELS, FLUID_PARALLELS_DESCRIPTOR);
         }
@@ -61,12 +70,17 @@ public class WirelessMEHatchMixinPlugin implements IMixinConfigPlugin {
 
     private static void requireMethod(String targetClassName, ClassNode targetClass, String methodName,
         String descriptor) {
+        requireMethod("GT " + GT_VERSION, targetClassName, targetClass, methodName, descriptor);
+    }
+
+    private static void requireMethod(String dependency, String targetClassName, ClassNode targetClass,
+        String methodName, String descriptor) {
         for (MethodNode method : targetClass.methods) {
             if (methodName.equals(method.name) && descriptor.equals(method.desc)) return;
         }
 
         throw new IllegalStateException(
-            "Wireless ME Hatch requires GT " + GT_VERSION
+            "Wireless ME Hatch requires " + dependency
                 + " target "
                 + targetClassName
                 + " to declare "

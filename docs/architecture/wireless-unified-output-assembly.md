@@ -8,6 +8,7 @@ The block targets GTNH 2.9.0 beta runtime jars:
 
 - GregTech `5.09.52.594`
 - AE2 `rv3-beta-977-GTNH`
+- GT: Not Leisure `dev-290` when its optional steam-machine compatibility hook is active
 
 ## Public Behavior
 
@@ -150,9 +151,16 @@ Controller registration and snapshots:
 
 - The assembly registers normally as the real `MTEHatchOutput` in `mOutputHatches`; there are no reflective controller-list writes or periodic reattachment calls.
 - The mod registers exactly one MetaTileEntity, the unified output assembly, at configurable ID `31701` by default. It does not reserve a second ID for a legacy input hatch.
-- Exact-descriptor, `require = 1`, `remap = false` `RETURN` Mixins augment the ordinary and steam `getOutputBusses()` snapshots with the same physical instance.
+- Exact-descriptor, `require = 1`, `remap = false` `RETURN` Mixins augment the ordinary GT, GT++ steam, and optional GTNL steam `getOutputBusses()` snapshots with the same physical instance.
 - Snapshot augmentation accepts only a valid object implementing all of `MTEHatchOutput`, `IOutputBus`, and `WirelessDualRoleOutput`, and deduplicates by object identity.
 - The steam controller's exact `addSteamBusOutput(...)` `HEAD` hook handles only that complete dual-role object and calls the controller's native `addOutputHatchToMachineList(...)`; all other objects continue through the unmodified steam method.
+
+GTNL `dev-290` compatibility:
+
+- GTNL's `SteamMultiMachineBase` overrides `getOutputBusses()` and otherwise hides the assembly registered in `mOutputHatches` from both `VoidProtectionHelper` and `ItemEjectionHelper`.
+- An optional `@Pseudo` Mixin augments that exact override at `RETURN`. When GTNL is absent, the string target is not loaded; when it is present, the Mixin plugin pins `getOutputBusses()Ljava/util/List;` and reports a version-specific startup error if the descriptor changes.
+- The assembly is never inserted into GTNL's backing `mSteamOutputs` or `mOutputBusses` lists. GTNL iterates those lists as `MTEHatchOutputBus`, so inserting the physical `MTEHatchOutput` assembly there would cause invalid casts.
+- This hook covers standard ProcessingLogic item-space checks and item commits, including the Large Steam Lathe. It deliberately does not rewrite GTNL custom paths that directly inspect backing lists: `SteamApiaryModule`, `SteamItemVault`, `FurnaceArray`, `LargeSteamFurnace`, or the legacy `addOutput(ItemStack)` / `tryAddOutput(ItemStack)` methods. `SteamGreenhouseModule` standard `addItemOutputs` calls are covered; its legacy migration call is not.
 
 Fluid output and void protection:
 
@@ -210,7 +218,7 @@ There is currently no configuration GUI. Empty-hand right-click is consumed and 
 
 Runtime verification must be done in the user's GTNH 2.9.0 beta instance:
 
-1. Client starts with the three exact pinned GT Mixins applied and no AE2 class Mixin.
+1. Client starts with the three core exact pinned GT Mixins, plus the optional GTNL steam Mixin when GTNL is installed, and no AE2 class Mixin.
 2. Link tool records an ME Controller.
 3. Link tool records a Security Terminal.
 4. Link tool binds the assembly.
@@ -223,3 +231,4 @@ Runtime verification must be done in the user's GTNH 2.9.0 beta instance:
 11. Restoring the target reconnects and flushes cached output.
 12. World reload preserves target, proxy state, capacities, and caches.
 13. `itemCapacity` and `fluidCapacity` limits are enforced without truncating long totals.
+14. A GTNL Large Steam Lathe with only the connected assembly passes item void protection and commits its item output to the assembly cache.
