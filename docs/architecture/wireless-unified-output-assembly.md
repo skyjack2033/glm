@@ -149,6 +149,7 @@ Item output:
 Controller registration and snapshots:
 
 - The assembly registers normally as the real `MTEHatchOutput` in `mOutputHatches`; there are no reflective controller-list writes or periodic reattachment calls.
+- The mod registers exactly one MetaTileEntity, the unified output assembly, at configurable ID `31701` by default. It does not reserve a second ID for a legacy input hatch.
 - Exact-descriptor, `require = 1`, `remap = false` `RETURN` Mixins augment the ordinary and steam `getOutputBusses()` snapshots with the same physical instance.
 - Snapshot augmentation accepts only a valid object implementing all of `MTEHatchOutput`, `IOutputBus`, and `WirelessDualRoleOutput`, and deduplicates by object identity.
 - The steam controller's exact `addSteamBusOutput(...)` `HEAD` hook handles only that complete dual-role object and calls the controller's native `addOutputHatchToMachineList(...)`; all other objects continue through the unmodified steam method.
@@ -200,7 +201,7 @@ There is currently no configuration GUI. Empty-hand right-click is consumed and 
 
 ## Non-Goals For This Refactor
 
-- No input hatch work.
+- No input hatch functionality.
 - No AE2 Memory Card mixin.
 - No global automatic discovery of a player's ME networks.
 - No hidden output delegate, second MetaTileEntity, reflective controller-list mutation, or periodic reattachment path.

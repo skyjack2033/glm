@@ -1,25 +1,27 @@
 package com.github.skyjack2033.wirelessmehatch.loader;
 
 import com.github.skyjack2033.wirelessmehatch.Config;
-import com.github.skyjack2033.wirelessmehatch.metatileentity.MTELegacyWirelessInputHatchME;
 import com.github.skyjack2033.wirelessmehatch.metatileentity.MTEWirelessUnifiedOutputAssemblyME;
 
 import gregtech.api.GregTechAPI;
+import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 
 public final class MetaTileEntityLoader {
 
     private MetaTileEntityLoader() {}
 
     public static void register() {
-        GregTechAPI.METATILEENTITIES[Config.wirelessUnifiedOutputAssemblyMeId] = new MTEWirelessUnifiedOutputAssemblyME(
-            Config.wirelessUnifiedOutputAssemblyMeId,
-            "hatch.output.me.wireless.unified",
-            "Wireless Unified Output Assembly (ME)");
-        if (Config.legacyWirelessInputHatchMeId != Config.wirelessUnifiedOutputAssemblyMeId) {
-            GregTechAPI.METATILEENTITIES[Config.legacyWirelessInputHatchMeId] = new MTELegacyWirelessInputHatchME(
-                Config.legacyWirelessInputHatchMeId,
-                "hatch.input.me.wireless.legacy",
-                "Legacy Wireless Input Hatch (ME)");
-        }
+        register(GregTechAPI.METATILEENTITIES, MTEWirelessUnifiedOutputAssemblyME::new);
+    }
+
+    static void register(IMetaTileEntity[] registry, MetaTileEntityFactory factory) {
+        int id = Config.wirelessUnifiedOutputAssemblyMeId;
+        registry[id] = factory.create(id, "hatch.output.me.wireless.unified", "Wireless Unified Output Assembly (ME)");
+    }
+
+    @FunctionalInterface
+    interface MetaTileEntityFactory {
+
+        IMetaTileEntity create(int id, String name, String regionalName);
     }
 }

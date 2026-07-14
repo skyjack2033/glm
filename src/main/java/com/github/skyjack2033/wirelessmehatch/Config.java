@@ -6,8 +6,7 @@ import net.minecraftforge.common.config.Configuration;
 
 public class Config {
 
-    public static int wirelessUnifiedOutputAssemblyMeId = 17001;
-    public static int legacyWirelessInputHatchMeId = 17002;
+    public static int wirelessUnifiedOutputAssemblyMeId = 31701;
     public static long defaultItemCapacity = Long.MAX_VALUE;
     public static long defaultFluidCapacity = Long.MAX_VALUE;
 
@@ -21,21 +20,6 @@ public class Config {
             17000,
             32000,
             "MetaTileEntity ID for the Wireless Unified Output Assembly (ME). Change if it conflicts with another mod.");
-
-        int legacyInputIdDefault = configuration
-            .get(
-                "metaTileEntityIds",
-                "wirelessInputHatchMeId",
-                legacyWirelessInputHatchMeId,
-                "Legacy config key for the removed Wireless Input Hatch (ME).")
-            .getInt(legacyWirelessInputHatchMeId);
-        legacyWirelessInputHatchMeId = configuration.getInt(
-            "legacyWirelessInputHatchMeId",
-            "metaTileEntityIds",
-            legacyInputIdDefault,
-            17000,
-            32000,
-            "MetaTileEntity ID reserved for old Wireless Input Hatch (ME) save compatibility.");
 
         defaultItemCapacity = parseLong(
             configuration

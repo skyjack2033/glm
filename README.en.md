@@ -21,7 +21,7 @@
 
 ## Behavior and Limits
 
-- The assembly is output-only. The legacy Wireless Input Hatch keeps a MetaTileEntity ID placeholder solely for old-save compatibility; it is disabled and cannot be used as an input hatch.
+- The assembly is output-only; the mod registers no input hatch or legacy input-hatch placeholder MTE.
 - Items use one aggregate cache capacity shared by all item types. Fluids use one aggregate cache capacity shared by all fluid types, not a separate capacity for each fluid.
 - Multi-fluid recipe parallelism is calculated from the combined demand of all fluid outputs and the shared remaining fluid capacity, bounded by the recipe's `maxParallel`.
 - When the network is disconnected, ME space is insufficient, or insertion energy is insufficient, uninserted items and fluids remain in the persistent cache and are retried after recovery. Capacities and caches are saved in the block NBT.
@@ -78,12 +78,11 @@ After the first launch, the configuration file is at `config/wirelessmehatch.cfg
 
 | Key | Default | Range or unit | Meaning |
 | --- | --- | --- | --- |
-| `metaTileEntityIds.wirelessUnifiedOutputAssemblyMeId` | `17001` | `17000..32000` | MetaTileEntity ID for the Wireless Unified Output Assembly. |
-| `metaTileEntityIds.legacyWirelessInputHatchMeId` | `17002` | `17000..32000` | Old-save placeholder ID for the legacy Wireless Input Hatch; that hatch is disabled. |
+| `metaTileEntityIds.wirelessUnifiedOutputAssemblyMeId` | `31701` | `17000..32000` | MetaTileEntity ID for the Wireless Unified Output Assembly. |
 | `outputCapacity.defaultItemCapacity` | `9223372036854775807` | item | Aggregate item cache capacity for newly placed assemblies. |
 | `outputCapacity.defaultFluidCapacity` | `9223372036854775807` | mB | Shared aggregate fluid cache capacity for newly placed assemblies. |
 
-The old key `metaTileEntityIds.wirelessInputHatchMeId` is migration input only and supplies a legacy value for `legacyWirelessInputHatchMeId`. Capacity defaults affect only newly placed assemblies; saved blocks restore their own `long` capacities and caches from NBT. Check the modpack for ID conflicts before changing either MetaTileEntity ID.
+The old `legacyWirelessInputHatchMeId` and `wirelessInputHatchMeId` keys are no longer read and can be removed. Before upgrading, back up the world and remove every legacy Wireless Input Hatch while still running the old version; this version no longer reserves `17002` for them. Existing configurations do not automatically change the unified assembly ID, which avoids silently breaking saves; remove assemblies using the old ID before changing it. Capacity defaults affect only newly placed assemblies; saved blocks restore their own `long` capacities and caches from NBT.
 
 ## Build and Verification
 

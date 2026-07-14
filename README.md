@@ -21,7 +21,7 @@
 
 ## 行为与限制
 
-- 总成是纯输出设备。旧版 Wireless Input Hatch 只为旧存档保留 MetaTileEntity ID 占位，功能已禁用，不能作为输入仓使用。
+- 总成是纯输出设备；模组不注册输入仓或旧输入仓占位 MTE。
 - 物品使用一个跨所有物品类型的总缓存容量；流体使用一个由所有流体类型共享的总缓存容量，而不是每种流体各有一份容量。
 - 多流体配方的并行数按所有流体输出的合计需求与共享流体剩余容量计算，并受配方 `maxParallel` 限制。
 - 网络断开、ME 空间不足或插入所需能量不足时，未插入的物品与流体会留在持久缓存中；网络恢复后会自动重试。容量和缓存随方块 NBT 保存。
@@ -78,12 +78,11 @@
 
 | 配置项 | 默认值 | 范围或单位 | 说明 |
 | --- | --- | --- | --- |
-| `metaTileEntityIds.wirelessUnifiedOutputAssemblyMeId` | `17001` | `17000..32000` | Wireless Unified Output Assembly 的 MetaTileEntity ID。 |
-| `metaTileEntityIds.legacyWirelessInputHatchMeId` | `17002` | `17000..32000` | 旧 Wireless Input Hatch 存档占位 ID；该旧仓已禁用。 |
+| `metaTileEntityIds.wirelessUnifiedOutputAssemblyMeId` | `31701` | `17000..32000` | Wireless Unified Output Assembly 的 MetaTileEntity ID。 |
 | `outputCapacity.defaultItemCapacity` | `9223372036854775807` | item | 新放置总成的物品总缓存容量。 |
 | `outputCapacity.defaultFluidCapacity` | `9223372036854775807` | mB | 新放置总成的共享流体总缓存容量。 |
 
-旧配置键 `metaTileEntityIds.wirelessInputHatchMeId` 只作为迁移输入，用来为 `legacyWirelessInputHatchMeId` 提供旧值。容量默认值只影响新放置的总成；已保存方块会从 NBT 恢复各自的 `long` 容量和缓存。修改任一 MetaTileEntity ID 前请检查整合包中的 ID 冲突。
+旧配置中的 `legacyWirelessInputHatchMeId` 和 `wirelessInputHatchMeId` 已不再读取，可以删除。升级前请先备份存档，并在旧版本中移除所有旧无线输入仓；本版本不再为其保留 `17002`。已有配置不会自动改写统一输出总成的 ID，以免破坏存档；若要修改该 ID，请先移除使用旧 ID 的总成。容量默认值只影响新放置的总成；已保存方块会从 NBT 恢复各自的 `long` 容量和缓存。
 
 ## 构建与验证
 
