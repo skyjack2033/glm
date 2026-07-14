@@ -94,11 +94,21 @@ It must not imply support for older GTNH versions or a stable public release unt
 
 ## Repository Cleanup
 
-Remove these tracked development artifacts:
+Remove these internal development artifacts:
 
 - `.wireless_temp`.
 - `.zcode/`.
 - `docs/superpowers/`.
+
+Remove these unrelated or invalid starter-template residues:
+
+- `docs/FAQ.md`.
+- `docs/migration.md`.
+- `docs/porting.md`.
+- `CODEOWNERS`.
+- `jitpack.yml`.
+
+The three documents are ExampleMod template guidance rather than project documentation, while the ownership and JitPack files are inactive starter metadata for services this repository does not use.
 
 Preserve `docs/architecture/` as the public technical documentation set.
 
@@ -109,13 +119,18 @@ Add root-anchored ignore rules for local agent artifacts so they cannot be recom
 - `/.wireless_temp`.
 - `/docs/superpowers/`.
 
+## Repository Metadata
+
+- `src/main/resources/mcmod.info` links to `https://github.com/skyjack2033/glm`.
+- The GitHub repository description will be changed from the ExampleMod starter text to `Wireless item and fluid output integration for GregTech New Horizons multiblocks.`.
+
 ## GitHub Actions Architecture
 
 ### CI: `.github/workflows/build-and-test.yml`
 
 Triggers:
 
-- Every branch push.
+- Pushes to every branch. The explicit `branches: ['**']` filter means tag pushes are not included.
 - Pull requests targeting `master`.
 - Manual dispatch.
 
@@ -139,11 +154,14 @@ Policy:
 
 - Permission is limited to `contents: write`.
 - Concurrency group is fixed to `dev-build`, with older runs cancelled.
-- The job checks out the exact commit, installs JDK 25, configures Gradle, and runs `spotlessJavaCheck test build`.
+- The job checks out the exact commit, installs JDK 25, configures Gradle, and runs the full `clean spotlessJavaCheck test build --rerun-tasks --console=plain` build.
 - The production JAR selector excludes `*-dev.jar`, `*-sources.jar`, and `*-api.jar`, and fails unless exactly one production JAR exists.
-- Only after a successful build, the workflow recreates the `dev-build` prerelease at the tested `master` commit.
-- The release is marked prerelease and is not marked as the latest stable release.
-- The uploaded file is the production JAR only.
+- `ARTIFACT_PATH` is passed from the selector through the publish step's environment and must resolve beneath `build/libs/`.
+- A missing release is recognized only from an HTTP 404; all other API errors fail visibly instead of being treated as absence.
+- On first publication, or when recovering a draft left by a failed attempt, the workflow creates a draft with the production JAR attached and publishes it only as the last step. The result is a prerelease with `latest=false`.
+- When a published `dev-build` release already exists, the workflow first uploads one uniquely named staged asset. Only after that succeeds does it move the `dev-build` tag, update the release as a prerelease with `latest=false`, delete the old assets, and PATCH the staged asset back to the production filename.
+- A final API check requires a published release containing exactly one asset with the production JAR filename.
+- The uploaded file is the production JAR only; development, sources, and API JARs are never release assets.
 
 The workflow uses the runner's GitHub CLI with `GITHUB_TOKEN`; no external release secret is required.
 
@@ -157,10 +175,12 @@ Policy:
 
 - Permission is limited to `contents: write`.
 - Release concurrency is grouped by tag and is never cancelled in progress.
-- The job installs JDK 25 and reruns `spotlessJavaCheck test build` from the tagged commit.
+- The job checks out the tagged commit, installs JDK 25, and runs the full `clean spotlessJavaCheck test build --rerun-tasks --console=plain` build.
 - The production JAR selector uses the same exact-one rule as the development release.
-- The workflow creates a normal GitHub Release for the existing tag and generates release notes.
-- Only the production JAR is attached.
+- `ARTIFACT_PATH` is passed through the publish step's environment and must identify the selected production JAR beneath `build/libs/`.
+- A draft left by a failed attempt is recycled so a rerun can converge; an already published or prerelease release for the tag is never overwritten.
+- The workflow creates a draft for the existing tag with the production JAR attached, then publishes it as the final step and marks it as the latest release.
+- Only the production JAR is attached; development, sources, and API JARs are excluded.
 - Release creation failures fail the workflow; publishing steps do not use `continue-on-error`.
 
 ### Dependency Updates: `.github/dependabot.yml`
@@ -186,7 +206,13 @@ The removed workflows either run the Java-25-only build tooling on Java 17, dupl
 
 ### Action Pinning
 
-Every local third-party Action reference is pinned to a full commit SHA and carries a version comment. Floating tags such as `@master`, `@latest`, or `@v5` are not permitted in local workflows. The GTNH reusable workflow is also pinned to a full commit SHA.
+Every local third-party Action reference is pinned to a full commit SHA and carries a version comment:
+
+- `actions/checkout` v5.0.1: `93cb6efe18208431cddfb8368fd83d5badbf9bfd`.
+- `actions/setup-java` v5.5.0: `0f481fcb613427c0f801b606911222b5b6f3083a`.
+- `gradle/actions/setup-gradle` v5.0.2: `0723195856401067f7a2779048b490ace7a47d7c`.
+
+Floating tags such as `@master`, `@latest`, or `@v5` are not permitted in local workflows. The GTNH reusable workflow remains pinned to commit `219d11877bb9008ac107d7d11e01bccef5ecbb8c`.
 
 ## Branch Policy
 
@@ -200,23 +226,20 @@ Every local third-party Action reference is pinned to a full commit SHA and carr
 ## Failure Behavior
 
 - A CI failure blocks confidence in the branch but never publishes an artifact as a release.
-- A failed development-release build leaves the previous `dev-build` release unchanged.
-- A release-update failure after a successful build fails visibly and is safe to rerun; GitHub release updates are not treated as atomic.
-- A failed tagged build does not create or modify a formal release.
-- Zero or multiple production JAR candidates fail release jobs before GitHub state changes.
-- Missing release permissions or GitHub CLI failures fail the publishing workflow visibly.
+- A failed development or tagged build leaves its release state unchanged.
+- When updating an existing published `dev-build`, an interrupted publication leaves either the previous production asset or the uniquely named staged asset downloadable. A rerun converges the release back to one normally named production JAR. A failed first publication may leave no release or a recyclable draft.
+- A failed formal publication may leave no release or a recyclable draft; once a formal release is published, the workflow treats it as immutable and refuses to overwrite it.
+- Zero or multiple production JAR candidates fail release jobs before any GitHub release state changes.
+- HTTP and permission failures other than an expected not-found response remain visible and fail the publishing workflow.
 
 ## Verification
 
 Implementation is complete only when all of these checks pass:
 
 1. `README.md` and `README.en.md` have matching sections, commands, versions, and configuration keys.
-2. Workflow YAML parses and GitHub recognizes all three workflows after push.
-3. No workflow contains floating Action references or `secrets: inherit`.
-4. `./gradlew spotlessJavaCheck test build --rerun-tasks --console=plain` succeeds locally.
-5. JUnit XML reports the expected tests with zero failures, errors, or skips.
-6. The production JAR selection returns exactly one file.
-7. Removed template and internal-development paths are absent from the Git tree.
-8. `git diff --check` emits no output.
-9. GitHub shows only the `master` branch after cleanup.
-10. The master CI run succeeds and the `dev-build` prerelease contains only the production JAR.
+2. `./gradlew clean spotlessJavaCheck test build --rerun-tasks --console=plain` succeeds locally.
+3. `actionlint .github/workflows/*.yml` accepts all local workflow files.
+4. Every local `uses:` reference has a full commit SHA, the shared workflow uses its recorded full SHA, and no workflow contains `secrets: inherit`.
+5. The production JAR selector returns exactly one file after excluding development, sources, and API JARs.
+6. Removed template and internal-development paths are absent from the Git tree, all four root-anchored ignore rules match, and the three `docs/architecture/` files remain tracked.
+7. `git diff --check` emits no output.
