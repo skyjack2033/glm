@@ -15,7 +15,7 @@ import com.github.skyjack2033.wirelessmehatch.api.SharedFluidOutputStore;
 import com.github.skyjack2033.wirelessmehatch.api.WirelessBindable;
 import com.github.skyjack2033.wirelessmehatch.api.WirelessDualRoleOutput;
 import com.github.skyjack2033.wirelessmehatch.api.WirelessOutputCapacityHost;
-import com.github.skyjack2033.wirelessmehatch.item.ItemWirelessLinkTool;
+import com.github.skyjack2033.wirelessmehatch.me.WirelessKitInteractionHandler;
 import com.github.skyjack2033.wirelessmehatch.me.WirelessLinkManager;
 import com.github.skyjack2033.wirelessmehatch.me.WirelessLinkTarget;
 import com.github.skyjack2033.wirelessmehatch.output.WirelessItemOutputTransaction;
@@ -65,7 +65,7 @@ public class MTEWirelessUnifiedOutputAssemblyME extends MTEHatchOutput implement
             regionalName,
             4,
             new String[] { "Wireless Unified Output Assembly for GTNH multiblocks",
-                "Acts as both an item output bus and a fluid output hatch", "Bind with a Wireless Link Tool",
+                "Acts as both an item output bus and a fluid output hatch", "Bind with the AE2 Wireless Kit",
                 "Outputs cached items and fluids into the bound ME network" },
             4);
         this.outputCore = new WirelessUnifiedOutputCore(
@@ -347,14 +347,14 @@ public class MTEWirelessUnifiedOutputAssemblyME extends MTEHatchOutput implement
 
     @Override
     public boolean onRightclick(IGregTechTileEntity baseTile, EntityPlayer player) {
-        if (bindFromHeldTool(player)) return true;
+        handleWirelessKitClick(baseTile, player);
         return true;
     }
 
     @Override
     public boolean onRightclick(IGregTechTileEntity baseTile, EntityPlayer player, ForgeDirection side, float x,
         float y, float z) {
-        if (bindFromHeldTool(player)) return true;
+        handleWirelessKitClick(baseTile, player);
         return true;
     }
 
@@ -565,11 +565,17 @@ public class MTEWirelessUnifiedOutputAssemblyME extends MTEHatchOutput implement
         return Math.max(0L, left + right);
     }
 
-    private boolean bindFromHeldTool(EntityPlayer player) {
+    private boolean handleWirelessKitClick(IGregTechTileEntity baseTile, EntityPlayer player) {
         ItemStack held = player.getHeldItem();
-        if (held != null && held.getItem() instanceof ItemWirelessLinkTool tool) {
-            return tool.bindTargetToAssembly(held, player, this);
-        }
-        return false;
+        if (player.isSneaking() || !WirelessKitInteractionHandler.isWirelessKit(held)) return false;
+        if (player.worldObj.isRemote) return true;
+        WirelessKitInteractionHandler.handleServerUse(
+            held,
+            player,
+            player.worldObj,
+            baseTile.getXCoord(),
+            baseTile.getYCoord(),
+            baseTile.getZCoord());
+        return true;
     }
 }

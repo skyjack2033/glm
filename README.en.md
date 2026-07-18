@@ -17,7 +17,7 @@
 
 - The Wireless Unified Output Assembly is one real `MTEHatchOutput` that directly implements `IOutputBus`. The same valid MetaTileEntity serves as both a fluid output hatch and an item output bus; there is no hidden delegate and no second MTE.
 - Exact-descriptor Mixins connect that instance to the native output paths of ordinary GT multiblocks and GT++ steam multiblocks; item output, fluid output, and multi-fluid parallel handling remain in the corresponding GT paths.
-- The Wireless Link Tool records an explicit AE2 ME Controller or Security Terminal and then binds the assembly to that target network; the implementation does not globally discover a player's ME networks.
+- The native GTNH AE2 `Wireless Kit` pairs the assembly with the network containing a wireless connector or wireless hub; this mod no longer registers its own link tool.
 
 ## Behavior and Limits
 
@@ -26,6 +26,7 @@
 - Multi-fluid recipe parallelism is calculated from the combined demand of all fluid outputs and the shared remaining fluid capacity, bounded by the recipe's `maxParallel`.
 - When the network is disconnected, ME space is insufficient, or insertion energy is insufficient, uninserted items and fluids remain in the persistent cache and are retried after recovery. Capacities and caches are saved in the block NBT.
 - The wireless proxy still requires AE2 power, a channel, and security permission. The assembly has no physical cable face and cannot be connected directly with ME cable.
+- The assembly always requires and consumes one ME channel. The Wireless Kit only selects the target network: it does not give the assembly the connector/hub's 8/32-channel capacity and does not consume one of its wireless-link slots.
 - `Bound` only means that a target record exists; the green binding chat message does not mean the assembly is already `Connected`. If the target chunk is unloaded, power is unavailable, no channel is available, or security checks fail, the target remains `Bound` while the connection state is `Disconnected`.
 - The cyan Wi-Fi `ACTIVE` state only means that a connection exists and the proxy is active. It does not mean that the ME network still has storage space available.
 
@@ -55,13 +56,14 @@ These versions are the current development and verification baseline. This docum
 
 ## Binding and Unbinding
 
-1. A player with permission on the target ME network uses the Wireless Link Tool to right-click an ME Controller or Security Terminal and record the target in the tool.
-2. Use the same tool to right-click the Wireless Unified Output Assembly and bind the stored target to the assembly.
-3. Connection state refreshes at most about once per second (20 ticks). The binding record remains while the target is temporarily unavailable, and retries continue.
-4. Sneak-right-clicking any block clears the target stored in the tool but does not unbind an already-bound assembly.
-5. Screwdriver-right-clicking the assembly clears its target and unbinds it.
+1. Use the GTNH AE2 `Wireless Kit` as a player who can access the target ME network. Endpoint clicks are normal, non-sneaking right-clicks.
+2. `Simple`: right-click the assembly and one wireless connector/hub in either order; the second click completes the pair.
+3. `Advanced`: the assembly can participate in `Queueing`/`Binding` and can be an endpoint or an intermediate member of `QueueingLine`/`BindingLine`.
+4. `Super`: register the assembly and target network in the Kit, open the native three-column GUI, place the assembly and connector/hub entries in the `toBind` and `target` columns, then use native Bind/Unbind.
+5. Connection state refreshes at most about once per second (20 ticks). The binding record remains while the target is temporarily unavailable, and retries continue.
+6. Screwdriver-right-clicking the assembly clears its target and unbinds it. Clearing a Kit mode only clears that Kit's data.
 
-If a scanner shows `Bound` + `Disconnected`, check in order that the target chunk is loaded, the AE2 network is powered, a channel is available, and the player who recorded the target has security permission on that network.
+If a scanner shows `Bound` + `Disconnected`, check in order that the target chunk is loaded, the AE2 network is powered, one channel is available for the assembly, and the player who performed the pairing has security permission on that network.
 
 ## Status Icons
 

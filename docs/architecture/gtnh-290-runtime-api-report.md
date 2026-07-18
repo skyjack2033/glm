@@ -170,24 +170,44 @@ public interface appeng.me.helpers.IGridProxyable {
 }
 ```
 
-Runtime tile classes for the binding tool:
+Runtime Wireless Kit API and endpoint classes:
 
 ```java
-public class appeng.tile.networking.TileController extends appeng.tile.grid.AENetworkPowerTile
+public interface appeng.api.definitions.IItems {
+    appeng.api.definitions.IItemDefinition toolWirelessKit();
+}
 ```
 
 ```java
-public class appeng.tile.misc.TileSecurity extends appeng.tile.grid.AENetworkTile
-    implements appeng.api.features.ILocatable,
-               appeng.api.networking.security.ISecurityProvider
+public interface appeng.api.definitions.IItemDefinition {
+    boolean isEnabled();
+    com.google.common.base.Optional<net.minecraft.item.ItemStack> maybeStack(int amount);
+}
+```
+
+```java
+public abstract class appeng.tile.networking.TileWirelessBase
+    implements appeng.api.networking.IGridHost
+```
+
+```java
+public class appeng.items.tools.ToolWirelessKit {
+    public net.minecraft.item.ItemStack onItemRightClick(net.minecraft.item.ItemStack stack,
+        net.minecraft.world.World world, net.minecraft.entity.player.EntityPlayer player);
+
+    public boolean onItemUse(net.minecraft.item.ItemStack stack,
+        net.minecraft.entity.player.EntityPlayer player, net.minecraft.world.World world,
+        int x, int y, int z, int side, float hitX, float hitY, float hitZ);
+}
 ```
 
 Important constraints:
 
 - `IGridNode` and `IGridConnection` are live runtime objects and must not be serialized directly.
-- Persist binding targets as coordinates, locatable serials, and owner identity.
-- Persist owner as UUID/name. Resolve AE2's integer player ID after world load with `WorldData.instance().playerData().getPlayerID(GameProfile)`, then call `IGridNode.setPlayerID(int)`.
-- Security Terminal can be used as an anchor via coordinates and `ILocatable` serial; ME Controller can be used as an anchor via coordinates.
+- Persist the selected wireless connector/hub coordinates and binding-player identity, never a live node or connection.
+- Persist the binding player as UUID/name. Resolve AE2's integer player ID after world load with `WorldData.instance().playerData().getPlayerID(GameProfile)`, then call `IGridNode.setPlayerID(int)`.
+- The Wireless Kit's `Super.pins` data is GUI placement/grouping state, not a binding target. BIND/UNBIND selections arrive through `WirelessKitCommand` rows.
+- `IGrid.getMachines(Class)` is keyed by exact runtime class in AE2 977. Super data discovery must query exact connector, hub, and assembly classes.
 - Use `MachineSource(IActionHost)` for machine-originated AE2 storage actions.
 
 ## Integration Rules
@@ -198,5 +218,5 @@ The implementation follows these rules for GTNH 2.9.0 beta compatibility:
 2. Add the physical object to item-bus snapshots only through exact pinned ordinary and steam `getOutputBusses()` return hooks, with validity checks and identity deduplication.
 3. Route steam registration through native `addOutputHatchToMachineList(...)`; do not write controller lists reflectively or reattach periodically.
 4. Keep GT's native item transaction and output dispatch authoritative. Use native fluid void protection as the integration point, with the finite shared-store aggregate hook determining the final result as described above.
-5. Do not mix into AE2's `ToolMemoryCard` for the first custom-tool implementation.
+5. Extend only the exact AE2 977 Wireless Kit item/container methods. Do not replace its GUI, packet, or NBT protocol, and do not intercept pure connector/hub commands.
 6. Persist the binding target and AE2 proxy state separately from output capacity and cache state.

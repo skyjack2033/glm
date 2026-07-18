@@ -15,7 +15,7 @@ The block targets GTNH 2.9.0 beta runtime jars:
 - The player places one block in a GT multiblock structure.
 - GT treats the block as an output bus for item outputs.
 - The same physical MetaTileEntity directly provides the fluid-hatch role, while exact pinned `getOutputBusses()` snapshot Mixins expose that same instance as the item bus.
-- The player binds the block to an ME network using this mod's custom wireless link tool.
+- The player pairs the block to a wireless connector or hub network using GTNH AE2's native Wireless Kit.
 - The block reconnects automatically after world load, chunk load, or transient network loss.
 - Screwdriver right-click clears the block's wireless target.
 - The block caches outputs when the ME network is unavailable, up to configured long capacities.
@@ -46,7 +46,8 @@ public final class WirelessLinkTarget {
 
     public enum AnchorType {
         ME_CONTROLLER,
-        SECURITY_TERMINAL
+        SECURITY_TERMINAL,
+        WIRELESS_CONNECTOR
     }
 
     private final AnchorType anchorType;
@@ -62,10 +63,11 @@ public final class WirelessLinkTarget {
 
 Target semantics:
 
-- `ME_CONTROLLER` uses `dimensionId/x/y/z` to resolve an AE2 controller tile and its grid node.
-- `SECURITY_TERMINAL` stores both coordinates and `locatableSerial`; serial is preferred, coordinates are fallback.
+- `WIRELESS_CONNECTOR` is the only target created by the current Wireless Kit integration. It resolves an exact `TileWirelessBase` connector or hub by dimension and coordinates.
+- `ME_CONTROLLER` and `SECURITY_TERMINAL` remain readable only for existing block NBT written by older releases.
 - `ownerUuid` and `ownerName` are persisted so AE2's per-world integer player ID can be re-resolved after load.
 - Live `IGridNode` and `IGridConnection` objects are not serialized.
+- The connector/hub is a network anchor only. The assembly keeps its own `REQUIRE_CHANNEL` proxy, consumes one channel, and is never inserted into the connector/hub link map.
 
 ## Public Interfaces
 
@@ -108,19 +110,7 @@ wirelessOutput.itemCache: compound
 wirelessOutput.fluidCache: compound
 ```
 
-Wireless link tool NBT:
-
-```text
-target.bound: boolean
-target.anchorType: string
-target.dim: int
-target.x: int
-target.y: int
-target.z: int
-target.locatableSerial: long
-target.ownerUuid: string
-target.ownerName: string
-```
+The mod does not replace AE2 Wireless Kit's item NBT schema. It reuses the native `Simple`, `Advanced`, `advancedLineQueue`, `advancedLineBinding`, and `Super` compounds. Two mode-scoped sidecar keys, `wirelessmehatch.pendingSimpleAnchor` and `wirelessmehatch.pendingAdvancedAnchor`, temporarily retain a full-hub coordinate only when AE2 would otherwise reject that first point before a later assembly click can reveal the intended pair. Clearing the corresponding native Kit mode clears its sidecar as well.
 
 ## GT Integration Architecture
 
@@ -176,23 +166,19 @@ Fluid output and void protection:
 2. On first tick, call `proxy.onReady()`.
 3. Load proxy node state from NBT.
 4. Resolve owner UUID/name to AE2 player ID and call `IGridNode.setPlayerID(int)`.
-5. Resolve remote target node from controller coordinates or security terminal serial/coordinates.
+5. Resolve the remote target from the persisted wireless connector/hub coordinates. Legacy controller/security-terminal targets remain loadable.
 6. Call `AEApi.instance().createGridConnection(localNode, remoteNode)`.
 7. Periodically verify `connection.a()/b()` still match the current local and remote nodes.
 8. On removal or chunk unload, destroy the connection and invalidate/unload the proxy.
 
-## Wireless Link Tool
+## GTNH AE2 Wireless Kit Integration
 
-First version uses a custom item, not AE2 Memory Card mixins.
-
-Tool interactions:
-
-- Right-click `appeng.tile.networking.TileController`: save `ME_CONTROLLER` target with coordinates and owner identity.
-- Right-click `appeng.tile.misc.TileSecurity`: save `SECURITY_TERMINAL` target with coordinates, locatable serial, and owner identity.
-- Right-click the assembly: call `bindWirelessTarget` using the tool's saved target.
-- Sneak-right-click: clear the tool target.
-
-All state-changing behavior is server-side. Client side only provides tooltip and feedback display.
+- Simple mode accepts the assembly and a wireless connector/hub in either click order.
+- Advanced Queueing/Binding and QueueingLine/BindingLine resolve coordinates as either native wireless tiles or assemblies. Line expansion checks every coordinate so an assembly between two ordinary endpoints is not skipped.
+- Super mode registers the GT base tile as an `IGridHost`, appends assembly entries to the native data packet, and routes only BIND/UNBIND commands whose expanded rows contain an assembly.
+- NETWORK/COLOR groups intentionally treat an assembly as a non-hub connector-shaped entry. BIND includes only unbound assemblies; UNBIND includes only bound assemblies.
+- Pure connector/hub interactions and commands remain on AE2's original code path.
+- Every state change is server-side. The client consumes the GT block click but does not mutate Kit or assembly NBT.
 
 ## Status Reporting
 
@@ -210,7 +196,7 @@ There is currently no configuration GUI. Empty-hand right-click is consumed and 
 ## Non-Goals For This Refactor
 
 - No input hatch functionality.
-- No AE2 Memory Card mixin.
+- No replacement Wireless Kit item, GUI, packet, or serialized data format.
 - No global automatic discovery of a player's ME networks.
 - No hidden output delegate, second MetaTileEntity, reflective controller-list mutation, or periodic reattachment path.
 
@@ -218,17 +204,18 @@ There is currently no configuration GUI. Empty-hand right-click is consumed and 
 
 Runtime verification must be done in the user's GTNH 2.9.0 beta instance:
 
-1. Client starts with the three core exact pinned GT Mixins, plus the optional GTNL steam Mixin when GTNL is installed, and no AE2 class Mixin.
-2. Link tool records an ME Controller.
-3. Link tool records a Security Terminal.
-4. Link tool binds the assembly.
-5. GT multiblock structure accepts the assembly.
-6. Item outputs enter ME.
-7. Fluid outputs enter ME.
-8. Recipes with both item and fluid outputs work.
-9. Security Terminal permissions work with the bound owner.
-10. Disconnecting the target leaves cached output intact.
-11. Restoring the target reconnects and flushes cached output.
-12. World reload preserves target, proxy state, capacities, and caches.
-13. `itemCapacity` and `fluidCapacity` limits are enforced without truncating long totals.
-14. A GTNL Large Steam Lathe with only the connected assembly passes item void protection and commits its item output to the assembly cache.
+1. Client starts with the exact pinned GT and AE2 Wireless Kit Mixins, plus the optional GTNL steam Mixin when GTNL is installed.
+2. Simple mode pairs in both click orders.
+3. All four Advanced submodes include assemblies at endpoints and inside lines.
+4. Super single/network/color entries bind and unbind through the native three-column GUI.
+5. The assembly consumes exactly one ME channel and never provides an 8/32-channel bridge or consumes a connector/hub wireless slot.
+6. GT multiblock structure accepts the assembly.
+7. Item outputs enter ME.
+8. Fluid outputs enter ME.
+9. Recipes with both item and fluid outputs work.
+10. Target-network security permissions are enforced for the player performing the pair.
+11. Disconnecting the target leaves cached output intact.
+12. Restoring the target reconnects and flushes cached output.
+13. World reload preserves target, proxy state, capacities, and caches.
+14. `itemCapacity` and `fluidCapacity` limits are enforced without truncating long totals.
+15. A GTNL Large Steam Lathe with only the connected assembly passes item void protection and commits its item output to the assembly cache.

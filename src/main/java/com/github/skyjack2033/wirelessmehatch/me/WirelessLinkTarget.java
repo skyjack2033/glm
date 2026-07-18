@@ -3,10 +3,8 @@ package com.github.skyjack2033.wirelessmehatch.me;
 import java.util.UUID;
 
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.tileentity.TileEntity;
 
-import appeng.tile.misc.TileSecurity;
-import appeng.tile.networking.TileController;
+import appeng.tile.networking.TileWirelessBase;
 
 public final class WirelessLinkTarget {
 
@@ -22,7 +20,8 @@ public final class WirelessLinkTarget {
 
     public enum AnchorType {
         ME_CONTROLLER,
-        SECURITY_TERMINAL
+        SECURITY_TERMINAL,
+        WIRELESS_CONNECTOR
     }
 
     private final AnchorType anchorType;
@@ -46,32 +45,17 @@ public final class WirelessLinkTarget {
         this.ownerName = ownerName;
     }
 
-    public static WirelessLinkTarget forTile(TileEntity tile, UUID ownerUuid, String ownerName) {
+    public static WirelessLinkTarget forWirelessConnector(TileWirelessBase tile, UUID ownerUuid, String ownerName) {
         if (tile == null || tile.getWorldObj() == null) return null;
-        if (tile instanceof TileController) {
-            return new WirelessLinkTarget(
-                AnchorType.ME_CONTROLLER,
-                tile.getWorldObj().provider.dimensionId,
-                tile.xCoord,
-                tile.yCoord,
-                tile.zCoord,
-                0L,
-                ownerUuid,
-                ownerName);
-        }
-        if (tile instanceof TileSecurity security) {
-            long serial = security.getLocatableSerial();
-            return new WirelessLinkTarget(
-                AnchorType.SECURITY_TERMINAL,
-                tile.getWorldObj().provider.dimensionId,
-                tile.xCoord,
-                tile.yCoord,
-                tile.zCoord,
-                serial,
-                ownerUuid,
-                ownerName);
-        }
-        return null;
+        return new WirelessLinkTarget(
+            AnchorType.WIRELESS_CONNECTOR,
+            tile.getWorldObj().provider.dimensionId,
+            tile.xCoord,
+            tile.yCoord,
+            tile.zCoord,
+            0L,
+            ownerUuid,
+            ownerName);
     }
 
     public static WirelessLinkTarget readFromNBT(NBTTagCompound tag) {

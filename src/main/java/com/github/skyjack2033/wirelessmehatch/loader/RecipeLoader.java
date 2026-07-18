@@ -1,6 +1,5 @@
 package com.github.skyjack2033.wirelessmehatch.loader;
 
-import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 
 import com.github.skyjack2033.wirelessmehatch.Config;
@@ -17,23 +16,7 @@ public final class RecipeLoader {
     private RecipeLoader() {}
 
     public static void register() {
-        registerLinkToolRecipe();
         registerUnifiedOutputAssemblyRecipe();
-    }
-
-    private static void registerLinkToolRecipe() {
-        ItemStack linkTool = new ItemStack(ItemLoader.WIRELESS_LINK_TOOL, 1);
-        ItemStack circuit = ItemList.Circuit_Advanced.get(1);
-        ItemStack dataCircuit = ItemList.Circuit_Data.get(1);
-        if (circuit == null || dataCircuit == null) {
-            WirelessMEHatch.LOG.warn("Skipping Wireless Link Tool recipe: missing circuit ingredient.");
-            return;
-        }
-        GTModHandler.addCraftingRecipe(
-            linkTool,
-            GTModHandler.RecipeBits.NOT_REMOVABLE,
-            new Object[] { " E ", "CDC", " R ", 'E', Items.ender_eye, 'C', circuit, 'D', dataCircuit, 'R',
-                Items.redstone });
     }
 
     private static void registerUnifiedOutputAssemblyRecipe() {
@@ -42,16 +25,24 @@ public final class RecipeLoader {
         ItemStack quantumSingularity = getAe2QuantumEntangledSingularity();
         ItemStack wirelessOutput = GTModHandler
             .getModItem("gregtech", "gt.blockmachines", 1, Config.wirelessUnifiedOutputAssemblyMeId);
-        ItemStack linkTool = new ItemStack(ItemLoader.WIRELESS_LINK_TOOL, 1);
+        ItemStack wirelessKit = getAe2WirelessKit();
+        ItemStack advancedCircuit = ItemList.Circuit_Advanced.get(1);
 
-        if (meOutputHatch == null || meOutputBus == null || quantumSingularity == null || wirelessOutput == null) {
+        if (meOutputHatch == null || meOutputBus == null
+            || quantumSingularity == null
+            || wirelessOutput == null
+            || wirelessKit == null
+            || advancedCircuit == null) {
             WirelessMEHatch.LOG.warn(
                 "Skipping Wireless Unified Output Assembly recipe: missing ingredient "
-                    + "(meOutputHatch={}, meOutputBus={}, quantumSingularity={}, wirelessOutput={}).",
+                    + "(meOutputHatch={}, meOutputBus={}, quantumSingularity={}, wirelessOutput={}, "
+                    + "wirelessKit={}, advancedCircuit={}).",
                 meOutputHatch,
                 meOutputBus,
                 quantumSingularity,
-                wirelessOutput);
+                wirelessOutput,
+                wirelessKit,
+                advancedCircuit);
             return;
         }
 
@@ -59,7 +50,23 @@ public final class RecipeLoader {
             wirelessOutput,
             GTModHandler.RecipeBits.NOT_REMOVABLE,
             new Object[] { "ABA", "CDC", "AEA", 'A', quantumSingularity, 'B', meOutputBus, 'C', meOutputHatch, 'D',
-                ItemList.Circuit_Advanced.get(1), 'E', linkTool });
+                advancedCircuit, 'E', wirelessKit });
+    }
+
+    private static ItemStack getAe2WirelessKit() {
+        try {
+            IItemDefinition wirelessKit = AEApi.instance()
+                .definitions()
+                .items()
+                .toolWirelessKit();
+            if (wirelessKit != null && wirelessKit.isEnabled()) {
+                Optional<ItemStack> stack = wirelessKit.maybeStack(1);
+                if (stack.isPresent()) return stack.get();
+            }
+        } catch (RuntimeException | LinkageError error) {
+            WirelessMEHatch.LOG.warn("Failed to get AE2 Wireless Kit via API: {}", error.toString());
+        }
+        return null;
     }
 
     private static ItemStack getAe2QuantumEntangledSingularity() {

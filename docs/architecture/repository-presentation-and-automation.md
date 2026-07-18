@@ -66,7 +66,7 @@ Both README files use this order:
 4. Functional limits and connection-state behavior.
 5. Tested compatibility and required mods.
 6. Installation and downloads.
-7. Wireless Link Tool binding and unbinding workflow.
+7. GTNH AE2 Wireless Kit Simple/Advanced/Super binding and unbinding workflow.
 8. Assembly status icons.
 9. Configuration table.
 10. Contributor build and verification commands.

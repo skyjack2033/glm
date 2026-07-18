@@ -21,6 +21,7 @@ import appeng.me.helpers.AENetworkProxy;
 import appeng.me.helpers.IGridProxyable;
 import appeng.tile.misc.TileSecurity;
 import appeng.tile.networking.TileController;
+import appeng.tile.networking.TileWirelessBase;
 
 public final class WirelessLinkManager {
 
@@ -224,6 +225,11 @@ public final class WirelessLinkManager {
         if (target.getAnchorType() == WirelessLinkTarget.AnchorType.SECURITY_TERMINAL
             && !(tile instanceof TileSecurity)) {
             lastFailure = "Target security terminal is missing";
+            return null;
+        }
+        if (target.getAnchorType() == WirelessLinkTarget.AnchorType.WIRELESS_CONNECTOR
+            && !(tile instanceof TileWirelessBase)) {
+            lastFailure = "Target wireless connector is missing";
             return null;
         }
         return tile;

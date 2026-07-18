@@ -2,11 +2,8 @@ package com.github.skyjack2033.wirelessmehatch.output;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -17,6 +14,8 @@ import net.minecraft.nbt.NBTTagCompound;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import com.github.skyjack2033.wirelessmehatch.MinecraftRegistryTestBootstrap;
 
 import gregtech.api.util.GTUtility;
 
@@ -36,23 +35,9 @@ public class WirelessItemOutputTransactionTest {
 
     @BeforeClass
     public static void bootstrapMinecraftRegistries() throws ReflectiveOperationException {
-        Method addObjectRaw = Item.itemRegistry.getClass()
-            .getDeclaredMethod("addObjectRaw", int.class, String.class, Object.class);
-        addObjectRaw.setAccessible(true);
-        registerItemIfAbsent(addObjectRaw, 288, "minecraft:feather");
-        testItemA = registerItemIfAbsent(addObjectRaw, TEST_ITEM_A_ID, TEST_ITEM_A_NAME);
-        testItemB = registerItemIfAbsent(addObjectRaw, TEST_ITEM_B_ID, TEST_ITEM_B_NAME);
-        assertNotNull(net.minecraft.init.Items.feather);
-    }
-
-    private static Item registerItemIfAbsent(Method addObjectRaw, int id, String name)
-        throws ReflectiveOperationException {
-        Item registered = (Item) Item.itemRegistry.getObject(name);
-        if (registered != null) return registered;
-        assertNull(Item.itemRegistry.getObjectById(id));
-        Item item = new Item();
-        addObjectRaw.invoke(Item.itemRegistry, id, name, item);
-        return item;
+        MinecraftRegistryTestBootstrap.initializeVanillaItems();
+        testItemA = MinecraftRegistryTestBootstrap.registerItemIfAbsent(TEST_ITEM_A_ID, TEST_ITEM_A_NAME);
+        testItemB = MinecraftRegistryTestBootstrap.registerItemIfAbsent(TEST_ITEM_B_ID, TEST_ITEM_B_NAME);
     }
 
     @Before

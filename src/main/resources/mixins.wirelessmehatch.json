@@ -7,9 +7,11 @@
   "target": "@env(DEFAULT)",
   "compatibilityLevel": "JAVA_8",
   "mixins": [
+    "ContainerWirelessKitMixin",
     "GTNLSteamMultiMachineBaseMixin",
     "MTEMultiBlockBaseMixin",
     "MTESteamMultiBlockBaseMixin",
+    "ToolWirelessKitMixin",
     "VoidProtectionHelperMixin"
   ],
   "client": [],
