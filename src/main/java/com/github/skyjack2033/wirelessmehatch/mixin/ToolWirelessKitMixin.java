@@ -15,8 +15,11 @@ import com.github.skyjack2033.wirelessmehatch.me.WirelessKitInteractionHandler;
 public abstract class ToolWirelessKitMixin {
 
     @Inject(
-        method = "onItemUse(Lnet/minecraft/item/ItemStack;Lnet/minecraft/entity/player/EntityPlayer;"
-            + "Lnet/minecraft/world/World;IIIIFFF)Z",
+        method = {
+            "onItemUse(Lnet/minecraft/item/ItemStack;Lnet/minecraft/entity/player/EntityPlayer;"
+                + "Lnet/minecraft/world/World;IIIIFFF)Z",
+            "func_77648_a(Lnet/minecraft/item/ItemStack;Lnet/minecraft/entity/player/EntityPlayer;"
+                + "Lnet/minecraft/world/World;IIIIFFF)Z" },
         at = @At("HEAD"),
         cancellable = true,
         require = 1,
@@ -28,8 +31,11 @@ public abstract class ToolWirelessKitMixin {
     }
 
     @Inject(
-        method = "onItemRightClick(Lnet/minecraft/item/ItemStack;Lnet/minecraft/world/World;"
-            + "Lnet/minecraft/entity/player/EntityPlayer;)Lnet/minecraft/item/ItemStack;",
+        method = {
+            "onItemRightClick(Lnet/minecraft/item/ItemStack;Lnet/minecraft/world/World;"
+                + "Lnet/minecraft/entity/player/EntityPlayer;)Lnet/minecraft/item/ItemStack;",
+            "func_77659_a(Lnet/minecraft/item/ItemStack;Lnet/minecraft/world/World;"
+                + "Lnet/minecraft/entity/player/EntityPlayer;)Lnet/minecraft/item/ItemStack;" },
         at = @At("HEAD"),
         require = 1,
         remap = false)

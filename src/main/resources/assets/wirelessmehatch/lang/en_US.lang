@@ -1,1 +1,13 @@
 item.gt.blockmachines.hatch.output.me.wireless.unified.name=Wireless Unified Output Assembly (ME)
+item.wirelessmehatch.combined_terminal.name=ME Combined Work Terminal
+gui.wirelessmehatch.combined_terminal.title=ME Combined Work Terminal
+gui.wirelessmehatch.combined_terminal.cache=Pattern Cache
+gui.wirelessmehatch.combined_terminal.interface_search=Search interface names or patterns
+gui.wirelessmehatch.combined_terminal.no_interface=No matching interface
+gui.wirelessmehatch.combined_terminal.pattern_encoder=Pattern Encoder
+gui.wirelessmehatch.combined_terminal.manual_crafting=Manual Crafting
+gui.wirelessmehatch.combined_terminal.disconnected=ME network disconnected
+gui.wirelessmehatch.combined_terminal.batch=Pattern Batch
+gui.wirelessmehatch.combined_terminal.item_substitution=Item
+gui.wirelessmehatch.combined_terminal.output_substitution=Output
+gui.wirelessmehatch.combined_terminal.batch_result=Batch complete: %s changed, %s skipped

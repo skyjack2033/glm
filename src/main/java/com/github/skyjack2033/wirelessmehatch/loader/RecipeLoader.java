@@ -4,6 +4,7 @@ import net.minecraft.item.ItemStack;
 
 import com.github.skyjack2033.wirelessmehatch.Config;
 import com.github.skyjack2033.wirelessmehatch.WirelessMEHatch;
+import com.github.skyjack2033.wirelessmehatch.terminal.TerminalRegistry;
 import com.google.common.base.Optional;
 
 import appeng.api.AEApi;
@@ -17,6 +18,53 @@ public final class RecipeLoader {
 
     public static void register() {
         registerUnifiedOutputAssemblyRecipe();
+        registerCombinedTerminalRecipe();
+    }
+
+    private static void registerCombinedTerminalRecipe() {
+        ItemStack patternTerminal = getAe2Stack(
+            AEApi.instance()
+                .definitions()
+                .parts()
+                .patternTerminal());
+        ItemStack craftingTerminal = getAe2Stack(
+            AEApi.instance()
+                .definitions()
+                .parts()
+                .craftingTerminal());
+        ItemStack interfaceTerminal = getAe2Stack(
+            AEApi.instance()
+                .definitions()
+                .parts()
+                .interfaceTerminal());
+        ItemStack engineeringProcessor = getAe2Stack(
+            AEApi.instance()
+                .definitions()
+                .materials()
+                .engProcessor());
+        ItemStack advancedCircuit = ItemList.Circuit_Advanced.get(1);
+
+        if (patternTerminal == null || craftingTerminal == null
+            || interfaceTerminal == null
+            || engineeringProcessor == null
+            || advancedCircuit == null) {
+            WirelessMEHatch.LOG.warn(
+                "Skipping ME Combined Work Terminal recipe: missing ingredient "
+                    + "(patternTerminal={}, craftingTerminal={}, interfaceTerminal={}, "
+                    + "engineeringProcessor={}, advancedCircuit={}).",
+                patternTerminal,
+                craftingTerminal,
+                interfaceTerminal,
+                engineeringProcessor,
+                advancedCircuit);
+            return;
+        }
+
+        GTModHandler.addCraftingRecipe(
+            TerminalRegistry.combinedTerminalStack(),
+            GTModHandler.RecipeBits.NOT_REMOVABLE,
+            new Object[] { "ABA", "CDC", "AEA", 'A', engineeringProcessor, 'B', patternTerminal, 'C', interfaceTerminal,
+                'D', craftingTerminal, 'E', advancedCircuit });
     }
 
     private static void registerUnifiedOutputAssemblyRecipe() {
@@ -67,6 +115,12 @@ public final class RecipeLoader {
             WirelessMEHatch.LOG.warn("Failed to get AE2 Wireless Kit via API: {}", error.toString());
         }
         return null;
+    }
+
+    private static ItemStack getAe2Stack(IItemDefinition definition) {
+        if (definition == null || !definition.isEnabled()) return null;
+        Optional<ItemStack> stack = definition.maybeStack(1);
+        return stack.orNull();
     }
 
     private static ItemStack getAe2QuantumEntangledSingularity() {

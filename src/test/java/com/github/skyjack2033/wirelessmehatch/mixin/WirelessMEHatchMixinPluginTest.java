@@ -17,10 +17,16 @@ import org.spongepowered.asm.lib.Opcodes;
 import org.spongepowered.asm.lib.Type;
 import org.spongepowered.asm.lib.tree.AnnotationNode;
 import org.spongepowered.asm.lib.tree.ClassNode;
+import org.spongepowered.asm.lib.tree.FieldNode;
 import org.spongepowered.asm.lib.tree.MethodNode;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.Inject;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 public class WirelessMEHatchMixinPluginTest {
 
@@ -30,6 +36,10 @@ public class WirelessMEHatchMixinPluginTest {
     private static final String VOID_TARGET = "gregtech.api.util.VoidProtectionHelper";
     private static final String WIRELESS_KIT_TARGET = "appeng.items.tools.ToolWirelessKit";
     private static final String WIRELESS_KIT_CONTAINER_TARGET = "appeng.container.implementations.ContainerWirelessKit";
+    private static final String COMBINED_TERMINAL_TARGET = "appeng.parts.reporting.AbstractPartTerminal";
+    private static final String INTERFACE_TERMINAL_TARGET = "appeng.container.implementations.ContainerInterfaceTerminal";
+    private static final String INTERFACE_TRACKER_TARGET = INTERFACE_TERMINAL_TARGET + "$InvTracker";
+    private static final String GUI_MONITOR_TARGET = "appeng.client.gui.implementations.GuiMEMonitorable";
 
     private static final String ORDINARY_MIXIN = "com.github.skyjack2033.wirelessmehatch.mixin.MTEMultiBlockBaseMixin";
     private static final String STEAM_MIXIN = "com.github.skyjack2033.wirelessmehatch.mixin.MTESteamMultiBlockBaseMixin";
@@ -37,12 +47,23 @@ public class WirelessMEHatchMixinPluginTest {
     private static final String VOID_MIXIN = "com.github.skyjack2033.wirelessmehatch.mixin.VoidProtectionHelperMixin";
     private static final String WIRELESS_KIT_MIXIN = "com.github.skyjack2033.wirelessmehatch.mixin.ToolWirelessKitMixin";
     private static final String WIRELESS_KIT_CONTAINER_MIXIN = "com.github.skyjack2033.wirelessmehatch.mixin.ContainerWirelessKitMixin";
+    private static final String COMBINED_TERMINAL_MIXIN = "com.github.skyjack2033.wirelessmehatch.mixin.CombinedTerminalActivationMixin";
+    private static final String INTERFACE_TERMINAL_ACCESSOR = "com.github.skyjack2033.wirelessmehatch.mixin.ContainerInterfaceTerminalAccessor";
+    private static final String INTERFACE_TRACKER_ACCESSOR = "com.github.skyjack2033.wirelessmehatch.mixin.InterfaceTerminalInvTrackerAccessor";
+    private static final String GUI_MONITOR_ACCESSOR = "com.github.skyjack2033.wirelessmehatch.mixin.GuiMEMonitorableAccessor";
 
     private static final String ON_ITEM_USE_DESCRIPTOR = "(Lnet/minecraft/item/ItemStack;Lnet/minecraft/entity/player/EntityPlayer;"
         + "Lnet/minecraft/world/World;IIIIFFF)Z";
+    private static final String ON_ITEM_USE_SRG = "func_77648_a";
     private static final String ON_ITEM_RIGHT_CLICK_DESCRIPTOR = "(Lnet/minecraft/item/ItemStack;"
         + "Lnet/minecraft/world/World;Lnet/minecraft/entity/player/EntityPlayer;)Lnet/minecraft/item/ItemStack;";
+    private static final String ON_ITEM_RIGHT_CLICK_SRG = "func_77659_a";
     private static final String PROCESS_COMMAND_DESCRIPTOR = "(Lappeng/helpers/WirelessKitCommand;)V";
+    private static final String PART_ACTIVATION_DESCRIPTOR = "(Lnet/minecraft/entity/player/EntityPlayer;"
+        + "Lnet/minecraft/util/Vec3;)Z";
+    private static final String OPEN_GUI_TARGET = "Lappeng/util/Platform;openGUI("
+        + "Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/tileentity/TileEntity;"
+        + "Lnet/minecraftforge/common/util/ForgeDirection;Lappeng/core/sync/GuiBridge;)V";
 
     private final WirelessMEHatchMixinPlugin plugin = new WirelessMEHatchMixinPlugin();
 
@@ -102,6 +123,17 @@ public class WirelessMEHatchMixinPluginTest {
             node(
                 method("onItemUse", ON_ITEM_USE_DESCRIPTOR),
                 method("onItemRightClick", ON_ITEM_RIGHT_CLICK_DESCRIPTOR)),
+            WIRELESS_KIT_MIXIN,
+            null);
+    }
+
+    @Test
+    public void wirelessKitMixinAcceptsSrgEntryPointNames() {
+        plugin.preApply(
+            WIRELESS_KIT_TARGET,
+            node(
+                method(ON_ITEM_USE_SRG, ON_ITEM_USE_DESCRIPTOR),
+                method(ON_ITEM_RIGHT_CLICK_SRG, ON_ITEM_RIGHT_CLICK_DESCRIPTOR)),
             WIRELESS_KIT_MIXIN,
             null);
     }
@@ -218,6 +250,103 @@ public class WirelessMEHatchMixinPluginTest {
     }
 
     @Test
+    public void combinedTerminalMixinRequiresExactPartActivationDescriptor() {
+        plugin.preApply(
+            COMBINED_TERMINAL_TARGET,
+            node(method("onPartActivate", PART_ACTIVATION_DESCRIPTOR)),
+            COMBINED_TERMINAL_MIXIN,
+            null);
+    }
+
+    @Test
+    public void combinedTerminalMixinRejectsChangedPartActivationDescriptor() {
+        assertMissingAe2(
+            COMBINED_TERMINAL_TARGET,
+            node(method("onPartActivate", "(Lnet/minecraft/entity/player/EntityPlayer;)Z")),
+            COMBINED_TERMINAL_MIXIN,
+            "onPartActivate",
+            PART_ACTIVATION_DESCRIPTOR);
+    }
+
+    @Test
+    public void mixinConfigurationListsCombinedTerminalMixin() throws IOException {
+        String configuration = readResource("/mixins.wirelessmehatch.json");
+        assertTrue(
+            "Missing CombinedTerminalActivationMixin entry",
+            configuration.contains("\"CombinedTerminalActivationMixin\""));
+    }
+
+    @Test
+    public void interfaceTerminalAccessorsRequireExactAe2Fields() {
+        plugin.preApply(
+            INTERFACE_TERMINAL_TARGET,
+            nodeWithFields(field("trackedById", "Ljava/util/Map;")),
+            INTERFACE_TERMINAL_ACCESSOR,
+            null);
+        plugin.preApply(
+            INTERFACE_TRACKER_TARGET,
+            nodeWithFields(field("patterns", "Lnet/minecraft/inventory/IInventory;")),
+            INTERFACE_TRACKER_ACCESSOR,
+            null);
+    }
+
+    @Test
+    public void interfaceTerminalAccessorsRejectChangedAe2Fields() {
+        assertMissingAe2(
+            INTERFACE_TERMINAL_TARGET,
+            nodeWithFields(field("trackedById", "Lit/unimi/dsi/fastutil/longs/Long2ObjectMap;")),
+            INTERFACE_TERMINAL_ACCESSOR,
+            "trackedById",
+            "Ljava/util/Map;");
+        assertMissingAe2(
+            INTERFACE_TRACKER_TARGET,
+            nodeWithFields(field("patterns", "Lappeng/tile/inventory/AppEngInternalInventory;")),
+            INTERFACE_TRACKER_ACCESSOR,
+            "patterns",
+            "Lnet/minecraft/inventory/IInventory;");
+    }
+
+    @Test
+    public void guiMonitorAccessorRequiresExactStandardSizeField() {
+        plugin.preApply(GUI_MONITOR_TARGET, nodeWithFields(field("standardSize", "I")), GUI_MONITOR_ACCESSOR, null);
+        assertMissingAe2(
+            GUI_MONITOR_TARGET,
+            nodeWithFields(field("standardSize", "J")),
+            GUI_MONITOR_ACCESSOR,
+            "standardSize",
+            "I");
+    }
+
+    @Test
+    public void mixinConfigurationSeparatesCommonAndClientAccessors() throws IOException {
+        JsonObject configuration = new JsonParser().parse(readResource("/mixins.wirelessmehatch.json"))
+            .getAsJsonObject();
+        List<String> common = jsonStrings(configuration.getAsJsonArray("mixins"));
+        List<String> client = jsonStrings(configuration.getAsJsonArray("client"));
+        assertTrue(common.contains("ContainerInterfaceTerminalAccessor"));
+        assertTrue(common.contains("InterfaceTerminalInvTrackerAccessor"));
+        assertTrue(client.contains("GuiMEMonitorableAccessor"));
+    }
+
+    @Test
+    public void combinedTerminalMixinConsumesTheTerminalActivationEntryPoint() throws IOException {
+        ClassNode mixinClass = readClass(COMBINED_TERMINAL_MIXIN);
+        AnnotationNode mixin = findAnnotation(mixinClass, Type.getDescriptor(Mixin.class));
+        assertTrue(mixin != null);
+        assertTrue(annotationStrings(mixin, "targets").contains(COMBINED_TERMINAL_TARGET));
+
+        MethodNode activation = findMethod(mixinClass, "wirelessmehatch$openCombinedTerminal");
+        AnnotationNode inject = findAnnotation(activation, Type.getDescriptor(Inject.class));
+        assertTrue(inject != null);
+        assertTrue(annotationStrings(inject, "method").contains("onPartActivate" + PART_ACTIVATION_DESCRIPTOR));
+        assertTrue(annotationBoolean(inject, "cancellable"));
+        assertTrue(annotationInteger(inject, "require") == 1);
+        AnnotationNode at = firstNestedAnnotation(inject, "at");
+        assertTrue(annotationStrings(at, "value").contains("INVOKE"));
+        assertTrue(annotationStrings(at, "target").contains(OPEN_GUI_TARGET));
+    }
+
+    @Test
     public void toolWirelessKitMixinPinsUseAndRightClickEntryPoints() throws IOException {
         ClassNode mixinClass = readClass(WIRELESS_KIT_MIXIN);
 
@@ -225,6 +354,7 @@ public class WirelessMEHatchMixinPluginTest {
         AnnotationNode useInject = findAnnotation(use, Type.getDescriptor(Inject.class));
         assertTrue(useInject != null);
         assertTrue(annotationStrings(useInject, "method").contains("onItemUse" + ON_ITEM_USE_DESCRIPTOR));
+        assertTrue(annotationStrings(useInject, "method").contains(ON_ITEM_USE_SRG + ON_ITEM_USE_DESCRIPTOR));
         assertTrue(annotationBoolean(useInject, "cancellable"));
         assertTrue(annotationInteger(useInject, "require") == 1);
 
@@ -234,6 +364,9 @@ public class WirelessMEHatchMixinPluginTest {
         assertTrue(
             annotationStrings(rightClickInject, "method")
                 .contains("onItemRightClick" + ON_ITEM_RIGHT_CLICK_DESCRIPTOR));
+        assertTrue(
+            annotationStrings(rightClickInject, "method")
+                .contains(ON_ITEM_RIGHT_CLICK_SRG + ON_ITEM_RIGHT_CLICK_DESCRIPTOR));
         assertTrue(annotationInteger(rightClickInject, "require") == 1);
         AnnotationNode rightClickAt = firstNestedAnnotation(rightClickInject, "at");
         assertTrue(annotationStrings(rightClickAt, "value").contains("HEAD"));
@@ -352,6 +485,18 @@ public class WirelessMEHatchMixinPluginTest {
         return node;
     }
 
+    private static ClassNode nodeWithFields(FieldNode... fields) {
+        ClassNode node = new ClassNode();
+        for (FieldNode field : fields) {
+            node.fields.add(field);
+        }
+        return node;
+    }
+
+    private static FieldNode field(String name, String descriptor) {
+        return new FieldNode(Opcodes.ACC_PRIVATE, name, descriptor, null, null);
+    }
+
     private static MethodNode method(String name, String descriptor) {
         return new MethodNode(Opcodes.ACC_PUBLIC, name, descriptor, null, null);
     }
@@ -378,6 +523,14 @@ public class WirelessMEHatchMixinPluginTest {
             }
             return new String(bytes.toByteArray(), StandardCharsets.UTF_8);
         }
+    }
+
+    private static List<String> jsonStrings(JsonArray values) {
+        List<String> result = new java.util.ArrayList<>();
+        for (JsonElement value : values) {
+            result.add(value.getAsString());
+        }
+        return result;
     }
 
     private static AnnotationNode findAnnotation(ClassNode node, String descriptor) {

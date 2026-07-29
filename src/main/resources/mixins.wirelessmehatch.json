@@ -8,12 +8,17 @@
   "compatibilityLevel": "JAVA_8",
   "mixins": [
     "ContainerWirelessKitMixin",
+    "CombinedTerminalActivationMixin",
+    "ContainerInterfaceTerminalAccessor",
     "GTNLSteamMultiMachineBaseMixin",
     "MTEMultiBlockBaseMixin",
     "MTESteamMultiBlockBaseMixin",
     "ToolWirelessKitMixin",
+    "InterfaceTerminalInvTrackerAccessor",
     "VoidProtectionHelperMixin"
   ],
-  "client": [],
+  "client": [
+    "GuiMEMonitorableAccessor"
+  ],
   "server": []
 }

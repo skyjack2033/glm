@@ -21,6 +21,9 @@ public class WirelessMEHatch {
     public static final String MODID = "wirelessmehatch";
     public static final Logger LOG = LogManager.getLogger(MODID);
 
+    @Mod.Instance(MODID)
+    public static WirelessMEHatch INSTANCE;
+
     @SidedProxy(
         clientSide = "com.github.skyjack2033.wirelessmehatch.ClientProxy",
         serverSide = "com.github.skyjack2033.wirelessmehatch.CommonProxy")

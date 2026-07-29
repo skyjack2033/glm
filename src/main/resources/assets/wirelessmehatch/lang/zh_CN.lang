@@ -1,1 +1,13 @@
 item.gt.blockmachines.hatch.output.me.wireless.unified.name=无线统一输出总成(ME)
+item.wirelessmehatch.combined_terminal.name=ME综合工作终端
+gui.wirelessmehatch.combined_terminal.title=ME综合工作终端
+gui.wirelessmehatch.combined_terminal.cache=样板缓存区
+gui.wirelessmehatch.combined_terminal.interface_search=搜索接口名称或样板
+gui.wirelessmehatch.combined_terminal.no_interface=没有匹配的接口
+gui.wirelessmehatch.combined_terminal.pattern_encoder=样板编码区
+gui.wirelessmehatch.combined_terminal.manual_crafting=手动合成
+gui.wirelessmehatch.combined_terminal.disconnected=ME网络已断开
+gui.wirelessmehatch.combined_terminal.batch=样板批处理
+gui.wirelessmehatch.combined_terminal.item_substitution=物品
+gui.wirelessmehatch.combined_terminal.output_substitution=产物
+gui.wirelessmehatch.combined_terminal.batch_result=批处理完成：已修改 %s，已跳过 %s
