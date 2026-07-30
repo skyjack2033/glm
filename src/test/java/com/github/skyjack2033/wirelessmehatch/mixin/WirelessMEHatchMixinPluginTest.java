@@ -64,6 +64,8 @@ public class WirelessMEHatchMixinPluginTest {
     private static final String OPEN_GUI_TARGET = "Lappeng/util/Platform;openGUI("
         + "Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/tileentity/TileEntity;"
         + "Lnet/minecraftforge/common/util/ForgeDirection;Lappeng/core/sync/GuiBridge;)V";
+    private static final String HAS_NO_TAGS_TARGET = "Lnet/minecraft/nbt/NBTTagCompound;hasNoTags()Z";
+    private static final String HAS_NO_TAGS_SRG_TARGET = "Lnet/minecraft/nbt/NBTTagCompound;func_82582_d()Z";
 
     private final WirelessMEHatchMixinPlugin plugin = new WirelessMEHatchMixinPlugin();
 
@@ -382,10 +384,16 @@ public class WirelessMEHatchMixinPluginTest {
         assertTrue(updateInject != null);
         assertTrue(annotationStrings(updateInject, "method").contains("updateData()V"));
         assertTrue(annotationInteger(updateInject, "require") == 1);
-        AnnotationNode updateAt = firstNestedAnnotation(updateInject, "at");
-        assertTrue(annotationStrings(updateAt, "value").contains("INVOKE"));
-        assertTrue(annotationStrings(updateAt, "target").contains("Lnet/minecraft/nbt/NBTTagCompound;hasNoTags()Z"));
-        assertTrue("BEFORE".equals(annotationEnumName(updateAt, "shift")));
+        List<AnnotationNode> updatePoints = nestedAnnotations(updateInject, "at");
+        List<String> updateTargets = new java.util.ArrayList<>();
+        assertTrue(updatePoints.size() == 2);
+        for (AnnotationNode updatePoint : updatePoints) {
+            assertTrue(annotationStrings(updatePoint, "value").contains("INVOKE"));
+            assertTrue("BEFORE".equals(annotationEnumName(updatePoint, "shift")));
+            updateTargets.addAll(annotationStrings(updatePoint, "target"));
+        }
+        assertTrue(updateTargets.contains(HAS_NO_TAGS_TARGET));
+        assertTrue(updateTargets.contains(HAS_NO_TAGS_SRG_TARGET));
 
         MethodNode command = findMethod(mixinClass, "wirelessmehatch$handleAssemblyCommand");
         AnnotationNode commandInject = findAnnotation(command, Type.getDescriptor(Inject.class));
@@ -598,14 +606,18 @@ public class WirelessMEHatchMixinPluginTest {
         return null;
     }
 
-    @SuppressWarnings("unchecked")
     private static AnnotationNode firstNestedAnnotation(AnnotationNode annotation, String key) {
-        Object value = annotationValue(annotation, key);
-        if (value instanceof AnnotationNode) return (AnnotationNode) value;
-        if (value instanceof List && !((List<?>) value).isEmpty()) {
-            return (AnnotationNode) ((List<Object>) value).get(0);
-        }
+        List<AnnotationNode> nested = nestedAnnotations(annotation, key);
+        if (!nested.isEmpty()) return nested.get(0);
         throw new AssertionError("Missing nested annotation " + key);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<AnnotationNode> nestedAnnotations(AnnotationNode annotation, String key) {
+        Object value = annotationValue(annotation, key);
+        if (value instanceof AnnotationNode) return Collections.singletonList((AnnotationNode) value);
+        if (value instanceof List) return (List<AnnotationNode>) value;
+        return Collections.emptyList();
     }
 
     private static String annotationEnumName(AnnotationNode annotation, String key) {

@@ -32,6 +32,52 @@ public class CombinedTerminalLayoutTest {
     }
 
     @Test
+    public void keepsCustomColumnsInsideTheGuiWidth() {
+        assertEquals(195, CombinedTerminalLayout.LEFT_PANEL_WIDTH);
+        assertEquals(204, CombinedTerminalLayout.CACHE_X);
+        assertEquals(312, CombinedTerminalLayout.CACHE_X + CombinedTerminalLayout.CACHE_COLUMNS * 18);
+        assertTrue(CombinedTerminalLayout.CACHE_SCROLLBAR_X >= 312);
+        assertTrue(CombinedTerminalLayout.CACHE_SCROLLBAR_X < CombinedTerminalLayout.WIDTH);
+
+        assertEquals(124, CombinedTerminalLayout.INTERFACE_LIST_X + CombinedTerminalLayout.INTERFACE_LIST_WIDTH);
+        assertTrue(CombinedTerminalLayout.INTERFACE_LIST_SCROLLBAR_X >= 124);
+        assertTrue(CombinedTerminalLayout.INTERFACE_LIST_SCROLLBAR_X < CombinedTerminalLayout.INTERFACE_PATTERN_X);
+        assertEquals(
+            307,
+            CombinedTerminalLayout.INTERFACE_PATTERN_X + CombinedTerminalLayout.INTERFACE_PATTERN_COLUMNS * 18);
+        assertTrue(CombinedTerminalLayout.INTERFACE_PATTERN_SCROLLBAR_X >= 307);
+        assertTrue(CombinedTerminalLayout.INTERFACE_PATTERN_SCROLLBAR_X < CombinedTerminalLayout.WIDTH);
+    }
+
+    @Test
+    public void reservesAFramedSearchHeaderAboveInterfaceRows() {
+        int interfaceTop = CombinedTerminalLayout.interfaceTop(3);
+        int searchTop = CombinedTerminalLayout.interfaceSearchTop(3);
+        int searchFrameBottom = searchTop + CombinedTerminalLayout.INTERFACE_SEARCH_HEIGHT + 1;
+
+        assertEquals(72, interfaceTop);
+        assertEquals(75, searchTop);
+        assertTrue(searchFrameBottom < CombinedTerminalLayout.interfaceViewportTop(3));
+        assertEquals(90, CombinedTerminalLayout.interfaceViewportTop(3));
+    }
+
+    @Test
+    public void alignsBottomSectionsWithoutCoveringTheInterfacePanel() {
+        int totalHeight = CombinedTerminalLayout.totalHeight(3, 3);
+        int bottomTop = CombinedTerminalLayout.bottomSectionTop(totalHeight);
+
+        assertEquals(148, bottomTop);
+        assertEquals(76, CombinedTerminalLayout.interfacePanelHeight(totalHeight, 3));
+        assertEquals(152, CombinedTerminalLayout.bottomTitleY(totalHeight));
+        assertEquals(171, CombinedTerminalLayout.manualGridTop(totalHeight));
+        assertEquals(189, CombinedTerminalLayout.manualOutputTop(totalHeight));
+        assertEquals(234, CombinedTerminalLayout.batchTitleY(totalHeight));
+        assertEquals(246, CombinedTerminalLayout.batchButtonTop(totalHeight, 0));
+        assertEquals(267, CombinedTerminalLayout.batchButtonTop(totalHeight, 1));
+        assertEquals(288, CombinedTerminalLayout.batchToggleTop(totalHeight));
+    }
+
+    @Test
     public void scrollsTheInterfaceListOnlyWhenNeededToRevealTheSelection() {
         assertEquals(0, CombinedTerminalLayout.scrollToReveal(7, 0, 3, 10));
         assertEquals(5, CombinedTerminalLayout.scrollToReveal(0, 7, 3, 10));

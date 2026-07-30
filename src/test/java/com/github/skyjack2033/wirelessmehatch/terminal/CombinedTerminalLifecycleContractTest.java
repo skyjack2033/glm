@@ -165,6 +165,15 @@ public class CombinedTerminalLifecycleContractTest {
             callFeedsImmediatelyInto(refresh, LAYOUT, "scrollToReveal", GUI_SCROLLBAR, "setCurrentScroll", "(I)V"));
     }
 
+    @Test
+    public void guiDrawsInterfaceSearchFrameBeforeTheTextField() throws IOException {
+        MethodNode draw = findMethod(readClass(GUI), "drawBG", "(IIII)V");
+        int frame = firstCallIndex(draw, GUI, "drawInterfaceSearchFrame");
+
+        assertTrue(frame >= 0);
+        assertTrue(firstCallIndexAfter(draw, GUI_TEXT_FIELD, "drawTextBox", frame) > frame);
+    }
+
     private static ClassNode readClass(String internalName) throws IOException {
         String resource = "/" + internalName + ".class";
         try (InputStream stream = CombinedTerminalLifecycleContractTest.class.getResourceAsStream(resource)) {
@@ -283,6 +292,17 @@ public class CombinedTerminalLifecycleContractTest {
     private static int firstCallIndex(MethodNode method, String owner, String name) {
         AbstractInsnNode[] instructions = method.instructions.toArray();
         for (int index = 0; index < instructions.length; index++) {
+            if (instructions[index] instanceof MethodInsnNode) {
+                MethodInsnNode call = (MethodInsnNode) instructions[index];
+                if (owner.equals(call.owner) && name.equals(call.name)) return index;
+            }
+        }
+        return -1;
+    }
+
+    private static int firstCallIndexAfter(MethodNode method, String owner, String name, int start) {
+        AbstractInsnNode[] instructions = method.instructions.toArray();
+        for (int index = Math.max(0, start + 1); index < instructions.length; index++) {
             if (instructions[index] instanceof MethodInsnNode) {
                 MethodInsnNode call = (MethodInsnNode) instructions[index];
                 if (owner.equals(call.owner) && name.equals(call.name)) return index;

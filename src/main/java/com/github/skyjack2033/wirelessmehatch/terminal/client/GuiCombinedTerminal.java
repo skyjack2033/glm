@@ -32,18 +32,6 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
     private static final int GUI_TEXT_COLOR = 0x404040;
     private static final int WIDTH = CombinedTerminalLayout.WIDTH;
 
-    private static final int CACHE_X = 204;
-    private static final int CACHE_Y = 19;
-    private static final int CACHE_COLUMNS = 6;
-
-    private static final int INTERFACE_LIST_X = 8;
-    private static final int INTERFACE_LIST_WIDTH = 116;
-    private static final int INTERFACE_PATTERN_X = 145;
-    private static final int INTERFACE_PATTERN_COLUMNS = InterfacePatternGrid.COLUMNS;
-
-    private static final int MANUAL_GRID_X = 213;
-    private static final int MANUAL_OUTPUT_X = 307;
-
     private final CombinedTerminalContainer container;
     private final InterfaceTerminalModel interfaceModel = new InterfaceTerminalModel();
     private final GuiScrollbar cacheScrollbar = new GuiScrollbar();
@@ -65,8 +53,8 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
         container = (CombinedTerminalContainer) inventorySlots;
         setReservedSpace(CombinedTerminalLayout.reservedSpace(interfaceRows));
         interfaceSearch = new MEGuiTextField(
-            INTERFACE_LIST_WIDTH,
-            12,
+            CombinedTerminalLayout.INTERFACE_LIST_WIDTH,
+            CombinedTerminalLayout.INTERFACE_SEARCH_HEIGHT,
             StatCollector.translateToLocal("gui.wirelessmehatch.combined_terminal.interface_search")) {
 
             @Override
@@ -94,20 +82,19 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
         guiLeft = CombinedTerminalLayout.guiLeft(width);
         repositionViewCellSlots();
 
-        int interfaceTop = getInterfaceTop();
-        interfaceSearch.x = guiLeft + INTERFACE_LIST_X;
-        interfaceSearch.y = guiTop + interfaceTop + 3;
+        interfaceSearch.x = guiLeft + CombinedTerminalLayout.INTERFACE_LIST_X;
+        interfaceSearch.y = guiTop + CombinedTerminalLayout.interfaceSearchTop(rows);
         interfaceSearch.setMaxStringLength(128);
 
-        cacheScrollbar.setLeft(321)
-            .setTop(CACHE_Y)
-            .setHeight(Math.max(16, rows * 18 - 2));
-        interfaceListScrollbar.setLeft(127)
-            .setTop(interfaceTop + 18)
-            .setHeight(interfaceRows * 18 - 2);
-        interfacePatternScrollbar.setLeft(312)
-            .setTop(interfaceTop + 18)
-            .setHeight(interfaceRows * 18 - 2);
+        cacheScrollbar.setLeft(CombinedTerminalLayout.CACHE_SCROLLBAR_X)
+            .setTop(CombinedTerminalLayout.CACHE_Y)
+            .setHeight(Math.max(16, rows * CombinedTerminalLayout.SLOT_SIZE - 2));
+        interfaceListScrollbar.setLeft(CombinedTerminalLayout.INTERFACE_LIST_SCROLLBAR_X)
+            .setTop(CombinedTerminalLayout.interfaceViewportTop(rows))
+            .setHeight(interfaceRows * CombinedTerminalLayout.SLOT_SIZE - 2);
+        interfacePatternScrollbar.setLeft(CombinedTerminalLayout.INTERFACE_PATTERN_SCROLLBAR_X)
+            .setTop(CombinedTerminalLayout.interfaceViewportTop(rows))
+            .setHeight(interfaceRows * CombinedTerminalLayout.SLOT_SIZE - 2);
 
         initBatchButtons();
         refreshCacheSlots();
@@ -167,13 +154,15 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
         int manualIndex = container.getManualCraftingSlots()
             .indexOf(slot);
         if (manualIndex >= 0) {
-            slot.xDisplayPosition = MANUAL_GRID_X + manualIndex % 3 * 18;
-            slot.yDisplayPosition = ySize - 157 + manualIndex / 3 * 18;
+            slot.xDisplayPosition = CombinedTerminalLayout.MANUAL_GRID_X
+                + manualIndex % 3 * CombinedTerminalLayout.SLOT_SIZE;
+            slot.yDisplayPosition = CombinedTerminalLayout.manualGridTop(ySize)
+                + manualIndex / 3 * CombinedTerminalLayout.SLOT_SIZE;
             return;
         }
         if (slot == container.getManualOutputSlot()) {
-            slot.xDisplayPosition = MANUAL_OUTPUT_X;
-            slot.yDisplayPosition = ySize - 139;
+            slot.xDisplayPosition = CombinedTerminalLayout.MANUAL_OUTPUT_X;
+            slot.yDisplayPosition = CombinedTerminalLayout.manualOutputTop(ySize);
             return;
         }
         if (container.getPatternCacheSlots()
@@ -191,19 +180,40 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
     @Override
     public void drawBG(int offsetX, int offsetY, int mouseX, int mouseY) {
         bindTexture("guis/terminal.png");
-        drawTexturedModalRect(offsetX, offsetY, 0, 0, 195, 18);
+        drawTexturedModalRect(offsetX, offsetY, 0, 0, CombinedTerminalLayout.LEFT_PANEL_WIDTH, 18);
         for (int row = 0; row < rows; row++) {
-            drawTexturedModalRect(offsetX, offsetY + 18 + row * 18, 0, 18, 195, 18);
+            drawTexturedModalRect(
+                offsetX,
+                offsetY + 18 + row * CombinedTerminalLayout.SLOT_SIZE,
+                0,
+                18,
+                CombinedTerminalLayout.LEFT_PANEL_WIDTH,
+                18);
         }
 
-        int interfaceTop = getInterfaceTop();
-        drawPanel(offsetX + 195, offsetY, WIDTH - 195, 18 + rows * 18);
-        drawPanel(offsetX, offsetY + interfaceTop, WIDTH, interfaceReservedSpace);
-        drawPanel(offsetX + 195, offsetY + ySize - 180, WIDTH - 195, 180);
+        int interfaceTop = CombinedTerminalLayout.interfaceTop(rows);
+        int bottomTop = CombinedTerminalLayout.bottomSectionTop(ySize);
+        drawPanel(
+            offsetX + CombinedTerminalLayout.LEFT_PANEL_WIDTH,
+            offsetY,
+            WIDTH - CombinedTerminalLayout.LEFT_PANEL_WIDTH,
+            interfaceTop);
+        drawPanel(offsetX, offsetY + interfaceTop, WIDTH, CombinedTerminalLayout.interfacePanelHeight(ySize, rows));
+        drawPanel(
+            offsetX + CombinedTerminalLayout.LEFT_PANEL_WIDTH,
+            offsetY + bottomTop,
+            WIDTH - CombinedTerminalLayout.LEFT_PANEL_WIDTH,
+            ySize - bottomTop);
         drawPanel(offsetX + WIDTH + 7, offsetY + 3, 24, 94);
 
         bindTexture("guis/pattern.png");
-        drawTexturedModalRect(offsetX, offsetY + ySize - 180, 0, 70, 195, 180);
+        drawTexturedModalRect(
+            offsetX,
+            offsetY + bottomTop,
+            0,
+            70,
+            CombinedTerminalLayout.LEFT_PANEL_WIDTH,
+            ySize - bottomTop);
 
         drawCacheSlotBackgrounds(offsetX, offsetY);
         drawInterfacePatternBackgrounds(offsetX, offsetY);
@@ -211,6 +221,7 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
         drawViewCellSlotBackgrounds(offsetX, offsetY);
 
         searchField.drawTextBox();
+        drawInterfaceSearchFrame();
         interfaceSearch.drawTextBox();
         updateViewCells();
     }
@@ -228,11 +239,10 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
             GUI_TEXT_COLOR);
         fontRendererObj.drawString(
             trim(StatCollector.translateToLocal("gui.wirelessmehatch.combined_terminal.cache"), 108),
-            CACHE_X,
+            CombinedTerminalLayout.CACHE_X,
             6,
             GUI_TEXT_COLOR);
 
-        int interfaceTop = getInterfaceTop();
         InterfaceTerminalModel.Entry selected = interfaceModel.getSelectedEntry();
         String selectedName;
         int selectedColor;
@@ -245,22 +255,30 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
                 : selected.getDisplayName();
             selectedColor = interfaceColor(selected);
         }
-        fontRendererObj.drawString(trim(selectedName, 162), INTERFACE_PATTERN_X, interfaceTop + 5, selectedColor);
+        fontRendererObj.drawString(
+            trim(selectedName, 162),
+            CombinedTerminalLayout.INTERFACE_PATTERN_X,
+            CombinedTerminalLayout.interfaceTop(rows) + 5,
+            selectedColor);
         fontRendererObj.drawString(
             StatCollector.translateToLocal("gui.wirelessmehatch.combined_terminal.pattern_encoder"),
             8,
-            ySize - 176,
+            CombinedTerminalLayout.bottomTitleY(ySize),
             GUI_TEXT_COLOR);
         fontRendererObj.drawString(
             StatCollector.translateToLocal("gui.wirelessmehatch.combined_terminal.manual_crafting"),
-            204,
-            ySize - 176,
+            CombinedTerminalLayout.RIGHT_CONTENT_X,
+            CombinedTerminalLayout.bottomTitleY(ySize),
             GUI_TEXT_COLOR);
-        fontRendererObj.drawString(">", 291, ySize - 135, GUI_TEXT_COLOR);
+        fontRendererObj.drawString(
+            ">",
+            CombinedTerminalLayout.MANUAL_ARROW_X,
+            CombinedTerminalLayout.manualOutputTop(ySize) + 4,
+            GUI_TEXT_COLOR);
         fontRendererObj.drawString(
             StatCollector.translateToLocal("gui.wirelessmehatch.combined_terminal.batch"),
-            204,
-            ySize - 94,
+            CombinedTerminalLayout.RIGHT_CONTENT_X,
+            CombinedTerminalLayout.batchTitleY(ySize),
             GUI_TEXT_COLOR);
 
         drawInterfaceList(mouseX - guiLeft, mouseY - guiTop);
@@ -376,16 +394,28 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
             int row = index / 3;
             GuiButton button = new GuiButton(
                 0x5B0 + index,
-                guiLeft + 204 + column * 39,
-                guiTop + ySize - 82 + row * 21,
+                guiLeft + CombinedTerminalLayout.RIGHT_CONTENT_X + column * 39,
+                guiTop + CombinedTerminalLayout.batchButtonTop(ySize, row),
                 34,
                 18,
                 labels[index]);
             scaleButtons[index] = button;
             buttonList.add(button);
         }
-        itemSubstitutionButton = new GuiButton(0x5B6, guiLeft + 204, guiTop + ySize - 40, 58, 18, "");
-        outputSubstitutionButton = new GuiButton(0x5B7, guiLeft + 264, guiTop + ySize - 40, 58, 18, "");
+        itemSubstitutionButton = new GuiButton(
+            0x5B6,
+            guiLeft + CombinedTerminalLayout.RIGHT_CONTENT_X,
+            guiTop + CombinedTerminalLayout.batchToggleTop(ySize),
+            58,
+            18,
+            "");
+        outputSubstitutionButton = new GuiButton(
+            0x5B7,
+            guiLeft + CombinedTerminalLayout.RIGHT_CONTENT_X + 60,
+            guiTop + CombinedTerminalLayout.batchToggleTop(ySize),
+            58,
+            18,
+            "");
         buttonList.add(itemSubstitutionButton);
         buttonList.add(outputSubstitutionButton);
         updateBatchToggleLabels();
@@ -414,19 +444,21 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
     private void refreshCacheSlots() {
         int visibleRows = Math.max(1, rows);
         int totalRows = (container.getPatternCacheSlots()
-            .size() + CACHE_COLUMNS
-            - 1) / CACHE_COLUMNS;
+            .size() + CombinedTerminalLayout.CACHE_COLUMNS
+            - 1) / CombinedTerminalLayout.CACHE_COLUMNS;
         cacheScrollbar.setRange(0, Math.max(0, totalRows - visibleRows), 1);
 
-        int firstSlot = cacheScrollbar.getCurrentScroll() * CACHE_COLUMNS;
-        int visibleSlots = visibleRows * CACHE_COLUMNS;
+        int firstSlot = cacheScrollbar.getCurrentScroll() * CombinedTerminalLayout.CACHE_COLUMNS;
+        int visibleSlots = visibleRows * CombinedTerminalLayout.CACHE_COLUMNS;
         List<AppEngSlot> slots = container.getPatternCacheSlots();
         for (int index = 0; index < slots.size(); index++) {
             AppEngSlot slot = slots.get(index);
             int visibleIndex = index - firstSlot;
             if (visibleIndex >= 0 && visibleIndex < visibleSlots) {
-                slot.xDisplayPosition = CACHE_X + visibleIndex % CACHE_COLUMNS * 18;
-                slot.yDisplayPosition = CACHE_Y + visibleIndex / CACHE_COLUMNS * 18;
+                slot.xDisplayPosition = CombinedTerminalLayout.CACHE_X
+                    + visibleIndex % CombinedTerminalLayout.CACHE_COLUMNS * CombinedTerminalLayout.SLOT_SIZE;
+                slot.yDisplayPosition = CombinedTerminalLayout.CACHE_Y
+                    + visibleIndex / CombinedTerminalLayout.CACHE_COLUMNS * CombinedTerminalLayout.SLOT_SIZE;
             } else {
                 slot.xDisplayPosition = -9000;
                 slot.yDisplayPosition = -9000;
@@ -486,13 +518,17 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
         InterfaceTerminalModel.Entry selected = interfaceModel.getSelectedEntry();
         if (selected == null) return;
 
-        int top = getInterfaceTop() + 18;
+        int top = CombinedTerminalLayout.interfaceViewportTop(rows);
         int firstRow = interfacePatternScrollbar.getCurrentScroll();
         for (int row = 0; row < interfaceRows; row++) {
-            for (int column = 0; column < INTERFACE_PATTERN_COLUMNS; column++) {
+            for (int column = 0; column < CombinedTerminalLayout.INTERFACE_PATTERN_COLUMNS; column++) {
                 int slot = InterfacePatternGrid.slotAt(selected.getInventorySize(), firstRow, row, column);
                 if (slot < 0) return;
-                drawSlotBackground(offsetX + INTERFACE_PATTERN_X + column * 18 - 1, offsetY + top + row * 18 - 1);
+                drawSlotBackground(
+                    offsetX + CombinedTerminalLayout.INTERFACE_PATTERN_X
+                        + column * CombinedTerminalLayout.SLOT_SIZE
+                        - 1,
+                    offsetY + top + row * CombinedTerminalLayout.SLOT_SIZE - 1);
             }
         }
     }
@@ -500,28 +536,41 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
     private void drawInterfaceList(int mouseX, int mouseY) {
         List<InterfaceTerminalModel.Entry> visible = interfaceModel.getVisibleEntries(interfaceSearch.getText());
         int first = interfaceListScrollbar.getCurrentScroll();
-        int top = getInterfaceTop() + 18;
+        int top = CombinedTerminalLayout.interfaceViewportTop(rows);
         for (int row = 0; row < interfaceRows && first + row < visible.size(); row++) {
             InterfaceTerminalModel.Entry entry = visible.get(first + row);
-            int y = top + row * 18;
+            int y = top + row * CombinedTerminalLayout.SLOT_SIZE;
             if (entry.getId() == interfaceModel.getSelectedEntryId()) {
-                drawRect(INTERFACE_LIST_X, y, INTERFACE_LIST_X + INTERFACE_LIST_WIDTH, y + 17, 0x805A7FA8);
-            } else if (mouseX >= INTERFACE_LIST_X && mouseX < INTERFACE_LIST_X + INTERFACE_LIST_WIDTH
+                drawRect(
+                    CombinedTerminalLayout.INTERFACE_LIST_X,
+                    y,
+                    CombinedTerminalLayout.INTERFACE_LIST_X + CombinedTerminalLayout.INTERFACE_LIST_WIDTH,
+                    y + 17,
+                    0x805A7FA8);
+            } else if (mouseX >= CombinedTerminalLayout.INTERFACE_LIST_X
+                && mouseX < CombinedTerminalLayout.INTERFACE_LIST_X + CombinedTerminalLayout.INTERFACE_LIST_WIDTH
                 && mouseY >= y
                 && mouseY < y + 17) {
-                    drawRect(INTERFACE_LIST_X, y, INTERFACE_LIST_X + INTERFACE_LIST_WIDTH, y + 17, 0x40FFFFFF);
+                    drawRect(
+                        CombinedTerminalLayout.INTERFACE_LIST_X,
+                        y,
+                        CombinedTerminalLayout.INTERFACE_LIST_X + CombinedTerminalLayout.INTERFACE_LIST_WIDTH,
+                        y + 17,
+                        0x40FFFFFF);
                 }
 
             ItemStack icon = entry.getSelfRepresentation();
-            int textX = INTERFACE_LIST_X + 2;
+            int textX = CombinedTerminalLayout.INTERFACE_LIST_X + 2;
             if (icon != null) {
-                drawItem(INTERFACE_LIST_X, y, icon);
-                textX += 18;
+                drawItem(CombinedTerminalLayout.INTERFACE_LIST_X, y, icon);
+                textX += CombinedTerminalLayout.SLOT_SIZE;
             }
             String name = entry.getDisplayName();
             if (name.isEmpty()) name = entry.getX() + ", " + entry.getY() + ", " + entry.getZ();
             fontRendererObj.drawString(
-                trim(name, INTERFACE_LIST_X + INTERFACE_LIST_WIDTH - textX - 2),
+                trim(
+                    name,
+                    CombinedTerminalLayout.INTERFACE_LIST_X + CombinedTerminalLayout.INTERFACE_LIST_WIDTH - textX - 2),
                 textX,
                 y + 4,
                 interfaceColor(entry));
@@ -532,14 +581,14 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
         InterfaceTerminalModel.Entry selected = interfaceModel.getSelectedEntry();
         if (selected == null) return;
 
-        int top = getInterfaceTop() + 18;
+        int top = CombinedTerminalLayout.interfaceViewportTop(rows);
         int firstRow = interfacePatternScrollbar.getCurrentScroll();
         for (int row = 0; row < interfaceRows; row++) {
-            for (int column = 0; column < INTERFACE_PATTERN_COLUMNS; column++) {
+            for (int column = 0; column < CombinedTerminalLayout.INTERFACE_PATTERN_COLUMNS; column++) {
                 int slot = InterfacePatternGrid.slotAt(selected.getInventorySize(), firstRow, row, column);
                 if (slot < 0) return;
-                int x = INTERFACE_PATTERN_X + column * 18;
-                int y = top + row * 18;
+                int x = CombinedTerminalLayout.INTERFACE_PATTERN_X + column * CombinedTerminalLayout.SLOT_SIZE;
+                int y = top + row * CombinedTerminalLayout.SLOT_SIZE;
                 ItemStack stack = InterfacePatternDisplay.resolve(selected.getStack(slot));
                 if (stack != null) drawItem(x, y, stack);
                 if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
@@ -552,7 +601,7 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
 
     private boolean clickInterfaceList(int mouseX, int mouseY) {
         if (!isInInterfaceList(mouseX, mouseY)) return false;
-        int row = (mouseY - getInterfaceTop() - 18) / 18;
+        int row = (mouseY - CombinedTerminalLayout.interfaceViewportTop(rows)) / CombinedTerminalLayout.SLOT_SIZE;
         List<InterfaceTerminalModel.Entry> visible = interfaceModel.getVisibleEntries(interfaceSearch.getText());
         int index = interfaceListScrollbar.getCurrentScroll() + row;
         if (index < 0 || index >= visible.size()) return true;
@@ -569,8 +618,9 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
         InterfaceTerminalModel.Entry selected = interfaceModel.getSelectedEntry();
         if (selected == null) return true;
 
-        int column = (mouseX - INTERFACE_PATTERN_X) / 18;
-        int visibleRow = (mouseY - getInterfaceTop() - 18) / 18;
+        int column = (mouseX - CombinedTerminalLayout.INTERFACE_PATTERN_X) / CombinedTerminalLayout.SLOT_SIZE;
+        int visibleRow = (mouseY - CombinedTerminalLayout.interfaceViewportTop(rows))
+            / CombinedTerminalLayout.SLOT_SIZE;
         int slot = InterfacePatternGrid
             .slotAt(selected.getInventorySize(), interfacePatternScrollbar.getCurrentScroll(), visibleRow, column);
         if (slot < 0) return true;
@@ -602,25 +652,26 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
     }
 
     private boolean isInCache(int x, int y) {
-        return x >= 195 && x < WIDTH && y >= 18 && y < 18 + rows * 18;
+        return x >= CombinedTerminalLayout.LEFT_PANEL_WIDTH && x < WIDTH
+            && y >= 18
+            && y < CombinedTerminalLayout.interfaceTop(rows);
     }
 
     private boolean isInInterfaceList(int x, int y) {
-        int top = getInterfaceTop() + 18;
-        return x >= INTERFACE_LIST_X && x < INTERFACE_LIST_X + INTERFACE_LIST_WIDTH
+        int top = CombinedTerminalLayout.interfaceViewportTop(rows);
+        return x >= CombinedTerminalLayout.INTERFACE_LIST_X
+            && x < CombinedTerminalLayout.INTERFACE_LIST_X + CombinedTerminalLayout.INTERFACE_LIST_WIDTH
             && y >= top
-            && y < top + interfaceRows * 18;
+            && y < top + interfaceRows * CombinedTerminalLayout.SLOT_SIZE;
     }
 
     private boolean isInInterfacePatterns(int x, int y) {
-        int top = getInterfaceTop() + 18;
-        return x >= INTERFACE_PATTERN_X && x < INTERFACE_PATTERN_X + INTERFACE_PATTERN_COLUMNS * 18
+        int top = CombinedTerminalLayout.interfaceViewportTop(rows);
+        return x >= CombinedTerminalLayout.INTERFACE_PATTERN_X
+            && x < CombinedTerminalLayout.INTERFACE_PATTERN_X
+                + CombinedTerminalLayout.INTERFACE_PATTERN_COLUMNS * CombinedTerminalLayout.SLOT_SIZE
             && y >= top
-            && y < top + interfaceRows * 18;
-    }
-
-    private int getInterfaceTop() {
-        return 18 + rows * 18;
+            && y < top + interfaceRows * CombinedTerminalLayout.SLOT_SIZE;
     }
 
     private int viewCellIndex(AppEngSlot slot) {
@@ -661,5 +712,15 @@ public final class GuiCombinedTerminal extends GuiPatternTerm implements IInterf
         drawRect(x, y, x + 18, y + 18, 0xFF555555);
         drawRect(x + 1, y + 1, x + 18, y + 18, 0xFFFFFFFF);
         drawRect(x + 1, y + 1, x + 17, y + 17, 0xFF8B8B8B);
+    }
+
+    private void drawInterfaceSearchFrame() {
+        int x = interfaceSearch.x - 1;
+        int y = interfaceSearch.y - 1;
+        int width = interfaceSearch.w + 2;
+        int height = interfaceSearch.h + 2;
+        drawRect(x, y, x + width, y + height, 0xFF555555);
+        drawRect(x + 1, y + 1, x + width, y + height, 0xFFFFFFFF);
+        drawRect(x + 1, y + 1, x + width - 1, y + height - 1, 0xFF8B8B8B);
     }
 }

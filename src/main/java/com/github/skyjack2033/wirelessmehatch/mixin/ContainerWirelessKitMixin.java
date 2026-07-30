@@ -34,7 +34,12 @@ public abstract class ContainerWirelessKitMixin {
 
     @Inject(
         method = "updateData()V",
-        at = @At(value = "INVOKE", target = "Lnet/minecraft/nbt/NBTTagCompound;hasNoTags()Z", shift = At.Shift.BEFORE),
+        at = {
+            @At(value = "INVOKE", target = "Lnet/minecraft/nbt/NBTTagCompound;hasNoTags()Z", shift = At.Shift.BEFORE),
+            @At(
+                value = "INVOKE",
+                target = "Lnet/minecraft/nbt/NBTTagCompound;func_82582_d()Z",
+                shift = At.Shift.BEFORE) },
         require = 1,
         remap = false)
     private void wirelessmehatch$appendAssemblyData(CallbackInfo callback) {
